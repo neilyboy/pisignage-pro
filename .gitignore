@@ -34,3 +34,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# PiSignage Pro — runtime data (never commit these)
+/data/
+/public/uploads/
