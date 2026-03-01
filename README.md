@@ -49,11 +49,105 @@ The Pi is a **dumb client** — it only runs Chromium in kiosk mode pointed at t
 
 ## 🖥️ Part 1 — Server Setup (Ubuntu)
 
-### Prerequisites
+You need a machine (Ubuntu 20.04 / 22.04 / 24.04) that your Pi(s) can reach on the network.
 
-You need a machine (Ubuntu 20.04 / 22.04 / 24.04) that your Pi(s) can reach on the network. This can be a dedicated server, a VM, an old laptop, or even a Raspberry Pi 4/5.
+> ### 🐳 Recommended: Docker Compose (easiest)
+> If you already run Docker on your server, use the Docker path below — it handles Node, ffmpeg, and yt-dlp inside the container automatically. No need to install anything else.
 
-### Step 1 — Install Node.js 18+
+---
+
+## 🐳 Option A — Docker Compose (Recommended)
+
+### Step 1 — Install Docker (if not already installed)
+
+```bash
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER   # log out and back in after this
+```
+
+### Step 2 — Clone the repo
+
+```bash
+git clone https://github.com/neilyboy/pisignage-pro.git
+cd pisignage-pro
+```
+
+### Step 3 — Choose your port
+
+Open `docker-compose.yml` and set the host port on the left side of the `ports` mapping:
+
+```yaml
+ports:
+  - "3100:3000"   # host_port:container_port — change 3100 to whatever is free on your server
+```
+
+The container always runs internally on `3000`. You only change the **left** number to whatever port is free on your host.
+
+> **Quick check for free ports:**
+> ```bash
+> sudo lsof -i :3100   # empty output = port is free
+> ```
+
+### Step 4 — Build and start
+
+```bash
+docker compose up -d --build
+```
+
+This builds the image (takes ~3–5 minutes on first run — it installs Node, ffmpeg, yt-dlp, and compiles the app), then starts the container in the background.
+
+### Step 5 — Verify
+
+```bash
+docker compose ps                          # should show pisignage as "running"
+curl http://localhost:3100/api/stats/summary
+# {"totalDevices":0,"activeDevices":0,...}
+```
+
+Open **http://YOUR_SERVER_IP:3100** (or whichever port you chose) in a browser.
+
+### Useful Docker commands
+
+| Task | Command |
+|------|---------|
+| View logs | `docker compose logs -f` |
+| Stop | `docker compose down` |
+| Restart | `docker compose restart` |
+| Rebuild after code changes | `docker compose up -d --build` |
+| Update to latest version | `git pull && docker compose up -d --build` |
+
+### Changing the port later
+
+Edit the left side of `ports` in `docker-compose.yml`, then restart:
+```bash
+docker compose down && docker compose up -d
+```
+No rebuild needed for a port change — that's the beauty of Docker.
+
+> **Note on the Pi setup command:** The `/api/pi-setup` script auto-detects the server URL from the request headers. So if you run on port `3100`, the Pi curl command is:
+> ```bash
+> curl -sL http://YOUR_SERVER_IP:3100/api/pi-setup | bash
+> ```
+> and the Pi will automatically register back to the correct address.
+
+### Data persistence
+
+Two directories are bind-mounted from your host into the container:
+
+| Host path | Container path | Contains |
+|-----------|---------------|---------|
+| `./data/` | `/app/data/` | SQLite database (`pisignage.db`) |
+| `./public/uploads/` | `/app/public/uploads/` | Uploaded images, videos, YouTube downloads |
+
+These survive container restarts, rebuilds, and updates. Back them up to keep your data safe.
+
+---
+
+## 🔧 Option B — Bare Metal (Node + pm2)
+
+Use this if you prefer not to use Docker.
+
+### Step 1 — Install Node.js 20
 
 ```bash
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
@@ -63,49 +157,39 @@ node --version   # should show v20.x.x
 
 ### Step 2 — Install ffmpeg and yt-dlp
 
-Required for YouTube video downloads and video duration detection.
-
 ```bash
 sudo apt-get install -y ffmpeg
 sudo pip3 install yt-dlp
-# or without pip3:
-sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
-sudo chmod a+rx /usr/local/bin/yt-dlp
 ```
 
-Verify:
-```bash
-ffmpeg -version | head -1
-yt-dlp --version
-```
-
-### Step 3 — Install pm2 (process manager)
+### Step 3 — Install pm2
 
 ```bash
 sudo npm install -g pm2
 ```
 
-### Step 4 — Clone and install PiSignage Pro
+### Step 4 — Clone, install, build
 
 ```bash
 git clone https://github.com/neilyboy/pisignage-pro.git
 cd pisignage-pro
 npm install
-```
-
-### Step 5 — Build the app
-
-```bash
 npm run build
 ```
 
-You should see output ending with something like:
+### Step 5 — Configure port
+
+If port `3000` is in use, edit these two files before starting:
+
+**`package.json`:**
+```json
+"start": "next start -p 3100",
 ```
-Route (app)                              Size     First Load JS
-┌ ○ /                                    146 B          87.5 kB
-├ ○ /admin                               2.35 kB        107 kB
-...
-✓ Generating static pages (13/13)
+
+**`ecosystem.config.js`:**
+```js
+args: 'start -p 3100',
+env: { NODE_ENV: 'production', PORT: '3100' },
 ```
 
 ### Step 6 — Start with pm2
@@ -113,56 +197,22 @@ Route (app)                              Size     First Load JS
 ```bash
 pm2 start ecosystem.config.js
 pm2 save
-pm2 startup   # follow the printed command to enable auto-start on reboot
+pm2 startup   # run the printed sudo command to enable auto-start on reboot
 ```
 
-### Step 7 — Verify it's running
+### Step 7 — Verify
 
 ```bash
-pm2 status
-curl http://localhost:3000/api/stats/summary
-# Should return: {"totalDevices":0,"activeDevsets":0,...}
+pm2 status   # should show "online", not "errored"
+pm2 logs pisignage --lines 20   # check for startup errors if status is wrong
+curl http://localhost:3100/api/stats/summary
 ```
 
-Open **http://YOUR_SERVER_IP:3000** in a browser — you should see the PiSignage Pro admin dashboard.
+> If pm2 shows the app as **errored** with many restarts, always check `pm2 logs pisignage --lines 30` — it will show the exact error on startup.
 
 ---
 
-### � Changing the Port (if 3000 is already in use)
-
-Port `3000` is the default. If something else is already running on it, change it in **three places**:
-
-**1. `package.json`** — update both the `start` script (production) and `dev` script:
-```json
-"dev": "next dev -p 3010",
-"start": "next start -p 3010",
-```
-
-**2. `ecosystem.config.js`** — update the args and PORT env var:
-```js
-args: 'start -p 3010',
-env: {
-  NODE_ENV: 'production',
-  PORT: '3010',
-},
-```
-
-**3. nginx `proxy_pass`** (if using nginx) — update the upstream port:
-```nginx
-proxy_pass http://localhost:3010;
-```
-
-Then rebuild and restart:
-```bash
-npm run build
-pm2 restart pisignage
-```
-
-> The Pi setup script at `/api/pi-setup` automatically bakes in the correct URL (including port) from the request headers — so if your server runs on port `3010`, the curl command becomes `curl -sL http://SERVER_IP:3010/api/pi-setup | bash` and everything works correctly.
-
----
-
-### �🔒 Optional: Set Up Nginx Reverse Proxy
+### 🔒 Optional: Set Up Nginx Reverse Proxy
 
 If you want to run on port 80/443 or use a domain name:
 

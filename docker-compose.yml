@@ -1,0 +1,14 @@
+services:
+  pisignage:
+    build: .
+    container_name: pisignage
+    restart: unless-stopped
+    ports:
+      - "3100:3000"        # change left side to any free port on your host
+    volumes:
+      - ./data:/app/data                    # SQLite database persists here
+      - ./public/uploads:/app/public/uploads # uploaded & downloaded media persists here
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - NEXT_TELEMETRY_DISABLED=1
