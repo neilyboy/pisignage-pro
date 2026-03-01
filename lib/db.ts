@@ -2,14 +2,20 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+// Lazy singleton — DB file is only opened on the first actual call.
+// This prevents SQLITE_BUSY during `next build` where multiple parallel
+// workers import this module but never actually invoke any DB methods.
+let _db: Database.Database | null = null;
 
-const db = new Database(path.join(DATA_DIR, 'pisignage.db'));
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
-
-db.exec(`
+function getDb(): Database.Database {
+  if (_db) return _db;
+  const DATA_DIR = path.join(process.cwd(), 'data');
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+  _db = new Database(path.join(DATA_DIR, 'pisignage.db'), { timeout: 15000 });
+  _db.pragma('busy_timeout = 15000');
+  _db.pragma('journal_mode = WAL');
+  _db.pragma('foreign_keys = ON');
+  _db.exec(`
   CREATE TABLE IF NOT EXISTS devices (
     id TEXT PRIMARY KEY,
     name TEXT,
@@ -103,5 +109,13 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_playlist_items_playlist ON playlist_items(playlist_id, position);
   CREATE INDEX IF NOT EXISTS idx_schedules_device ON schedules(device_id);
 `);
+  return _db;
+}
+
+const db = new Proxy({} as Database.Database, {
+  get(_target, prop) {
+    return (getDb() as unknown as Record<string | symbol, unknown>)[prop];
+  },
+});
 
 export default db;
