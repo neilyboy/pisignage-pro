@@ -26,9 +26,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Copy built app
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
 
-# Runtime dirs (mounted as volumes)
+# Runtime dirs (uploads is bind-mounted from host, data holds SQLite DB)
 RUN mkdir -p /app/data /app/public/uploads
 
 EXPOSE 3000
