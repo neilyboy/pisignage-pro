@@ -7,147 +7,152 @@ export async function GET(req: NextRequest) {
   const proto = req.headers.get('x-forwarded-proto') ?? 'http';
   const serverUrl = `${proto}://${host}`;
 
-  const script = `#!/bin/bash
-# PiSignage Pro — Raspberry Pi Zero 2W Setup Script
-# Auto-generated for server: ${serverUrl}
+  // Build script with string concatenation to avoid JS template literal
+  // collisions with bash $() command substitutions and heredoc backticks.
+  const S = serverUrl;
+  const script = [
+    '#!/bin/bash',
+    '# PiSignage Pro - Raspberry Pi Zero 2W Setup Script',
+    '# Auto-generated for server: ' + S,
+    '',
+    'set -e',
+    'SERVER_URL="' + S + '"',
+    'PISIGNAGE_DIR="$HOME/.pisignage"',
+    '',
+    'echo ""',
+    'echo "  PiSignage Pro - Pi Client Setup"',
+    'echo "  ================================="',
+    'echo "  Setting up your Pi display client..."',
+    'echo ""',
+    '',
+    '# Check if already set up',
+    'if [ -f "$PISIGNAGE_DIR/device_id" ]; then',
+    '  EXISTING_ID=$(cat "$PISIGNAGE_DIR/device_id")',
+    '  echo "  [!] Device already registered: $EXISTING_ID"',
+    '  echo "  [!] Delete $PISIGNAGE_DIR to re-register."',
+    '  exit 0',
+    'fi',
+    '',
+    'echo "==> Step 1: Installing dependencies..."',
+    'sudo apt-get update -qq',
+    'sudo apt-get install -y --no-install-recommends \\',
+    '  chromium-browser \\',
+    '  unclutter \\',
+    '  xserver-xorg \\',
+    '  xinit \\',
+    '  x11-xserver-utils \\',
+    '  curl \\',
+    '  python3 2>&1 | tail -5',
+    '',
+    'echo "==> Step 2: Getting local IP..."',
+    'IP=$(hostname -I | awk \'{print $1}\')',
+    'echo "    IP: $IP"',
+    '',
+    'echo "==> Step 3: Registering with PiSignage Pro server..."',
+    'RESPONSE=$(curl -sf -X POST "$SERVER_URL/api/devices" \\',
+    '  -H "Content-Type: application/json" \\',
+    '  -d "{\\"ip_address\\":\\"$IP\\",\\"version\\":\\"1.0\\"}" 2>&1) || {',
+    '  echo "  [ERROR] Could not reach server at $SERVER_URL"',
+    '  echo "  Make sure the server is running and accessible from this Pi."',
+    '  exit 1',
+    '}',
+    '',
+    'DEVICE_ID=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)[\'id\'])")',
+    'PAIR_CODE=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)[\'pairing_code\'])")',
+    '',
+    'echo "    Device ID: $DEVICE_ID"',
+    'echo "    Pairing Code: $PAIR_CODE"',
+    '',
+    'echo "==> Step 4: Saving configuration..."',
+    'mkdir -p "$PISIGNAGE_DIR"',
+    'echo "$DEVICE_ID" > "$PISIGNAGE_DIR/device_id"',
+    'echo "$SERVER_URL" > "$PISIGNAGE_DIR/server_url"',
+    'echo "$PAIR_CODE" > "$PISIGNAGE_DIR/pairing_code"',
+    '',
+    'echo "==> Step 5: Creating X startup script (~/.xinitrc)..."',
+    'cat > ~/.xinitrc << \'XINITRC\'',
+    '#!/bin/bash',
+    'xset s off',
+    'xset s noblank',
+    'xset -dpms',
+    'unclutter -idle 0 -root &',
+    '',
+    'SERVER_URL=$(cat ~/.pisignage/server_url)',
+    'DEVICE_ID=$(cat ~/.pisignage/device_id)',
+    'PAIR_CODE=$(cat ~/.pisignage/pairing_code)',
+    '',
+    '# Send heartbeat every 30s so server knows we\'re alive',
+    '(while true; do',
+    '  curl -sf -X POST "$SERVER_URL/api/devices/$DEVICE_ID/heartbeat" \\',
+    '    -H "Content-Type: application/json" \\',
+    '    -d "{}" > /dev/null 2>&1',
+    '  sleep 30',
+    'done) &',
+    '',
+    '# Wait for adoption then navigate to display page',
+    '(while true; do',
+    '  STATUS=$(curl -sf "$SERVER_URL/api/devices/pair?code=$PAIR_CODE" 2>/dev/null)',
+    '  if echo "$STATUS" | python3 -c "import sys,json; d=json.load(sys.stdin); exit(0 if d.get(\'adopted\') else 1)" 2>/dev/null; then',
+    '    DISPLAY_ID=$(echo "$STATUS" | python3 -c "import sys,json; print(json.load(sys.stdin).get(\'id\',\'\'))")',
+    '    xdotool search --onlyvisible --class chromium key --window %@ ctrl+l',
+    '    sleep 0.3',
+    '    xdotool type --clearmodifiers "$SERVER_URL/display/$DISPLAY_ID"',
+    '    xdotool key --clearmodifiers Return',
+    '    break',
+    '  fi',
+    '  sleep 5',
+    'done) &',
+    '',
+    'exec chromium-browser \\',
+    '  --kiosk \\',
+    '  --noerrdialogs \\',
+    '  --disable-infobars \\',
+    '  --no-first-run \\',
+    '  --disable-session-crashed-bubble \\',
+    '  --autoplay-policy=no-user-gesture-required \\',
+    '  --remote-debugging-port=9222 \\',
+    '  --disable-translate \\',
+    '  --overscroll-history-navigation=0 \\',
+    '  --check-for-update-interval=31536000 \\',
+    '  "$SERVER_URL/pair/$PAIR_CODE"',
+    'XINITRC',
+    'chmod +x ~/.xinitrc',
+    '',
+    'echo "==> Step 6: Configuring auto-start X on login..."',
+    'if ! grep -q "startx" ~/.bash_profile 2>/dev/null; then',
+    '  echo \'[[ -z $DISPLAY && $XDG_VTNR -eq 1 ]] && startx >> ~/.startx.log 2>&1\' >> ~/.bash_profile',
+    'fi',
+    '',
+    'echo "==> Step 7: Configuring auto-login (tty1)..."',
+    'sudo mkdir -p /etc/systemd/system/getty@tty1.service.d',
+    'CURRENT_USER=$(whoami)',
+    'sudo tee /etc/systemd/system/getty@tty1.service.d/autologin.conf > /dev/null << EOF',
+    '[Service]',
+    'ExecStart=',
+    'ExecStart=-/sbin/agetty --autologin $CURRENT_USER --noclear %I $TERM',
+    'EOF',
+    'sudo systemctl daemon-reload',
+    '',
+    'echo ""',
+    'echo "============================================="',
+    'echo "  PiSignage Pro Setup Complete!"',
+    'echo ""',
+    'echo "  Pairing Code: $PAIR_CODE"',
+    'echo ""',
+    'echo "  Next steps:"',
+    'echo "  1. Reboot this Pi"',
+    'echo "  2. Go to: ' + S + '/admin/devices"',
+    'echo "  3. Find Pending Adoption and click Adopt Device"',
+    'echo "  4. Give it a name and assign a playlist"',
+    'echo "============================================="',
+    'echo ""',
+    'read -p "Reboot now? (y/N) " -n 1 -r',
+    'echo',
+    'if [[ $REPLY =~ ^[Yy]$ ]]; then',
+    '  sudo reboot',
+    'fi',
+  ].join('\n') + '\n';
 
-set -e
-SERVER_URL="${serverUrl}"
-PISIGNAGE_DIR="$HOME/.pisignage"
-
-echo ""
-echo "  ____  _ ____  _                               ____            "
-echo " |  _ \\(_)  _ \\(_) __ _ _ __   __ _  __ _  ___|  _ \\ _ __ ___ "
-echo " | |_) | | |_) | |/ _\` | '_ \\ / _\` |/ _\` |/ _ \\ |_) | '__/ _ \\"
-echo " |  __/| |  __/| | (_| | | | | (_| | (_| |  __/  __/| | | (_) |"
-echo " |_|   |_|_|   |_|\\__, |_| |_|\\__,_|\\__, |\\___|_|   |_|  \\___/ "
-echo "                  |___/              |___/                       "
-echo ""
-echo "  Setting up your Pi display client..."
-echo ""
-
-# Check if already set up
-if [ -f "$PISIGNAGE_DIR/device_id" ]; then
-  EXISTING_ID=$(cat "$PISIGNAGE_DIR/device_id")
-  echo "  [!] Device already registered: $EXISTING_ID"
-  echo "  [!] Delete $PISIGNAGE_DIR to re-register."
-  exit 0
-fi
-
-echo "==> Step 1: Installing dependencies..."
-sudo apt-get update -qq
-sudo apt-get install -y --no-install-recommends \\
-  chromium-browser \\
-  unclutter \\
-  xserver-xorg \\
-  xinit \\
-  x11-xserver-utils \\
-  curl \\
-  python3 2>&1 | tail -5
-
-echo "==> Step 2: Getting local IP..."
-IP=$(hostname -I | awk '{print $1}')
-echo "    IP: $IP"
-
-echo "==> Step 3: Registering with PiSignage Pro server..."
-RESPONSE=$(curl -sf -X POST "$SERVER_URL/api/devices" \\
-  -H "Content-Type: application/json" \\
-  -d "{\\"ip_address\\":\\"$IP\\",\\"version\\":\\"1.0\\"}" 2>&1) || {
-  echo "  [ERROR] Could not reach server at $SERVER_URL"
-  echo "  Make sure the server is running and accessible from this Pi."
-  exit 1
-}
-
-DEVICE_ID=$(echo $RESPONSE | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
-PAIR_CODE=$(echo $RESPONSE | python3 -c "import sys,json; print(json.load(sys.stdin)['pairing_code'])")
-
-echo "    Device ID: $DEVICE_ID"
-echo "    Pairing Code: $PAIR_CODE"
-
-echo "==> Step 4: Saving configuration..."
-mkdir -p "$PISIGNAGE_DIR"
-echo "$DEVICE_ID" > "$PISIGNAGE_DIR/device_id"
-echo "$SERVER_URL" > "$PISIGNAGE_DIR/server_url"
-echo "$PAIR_CODE" > "$PISIGNAGE_DIR/pairing_code"
-
-echo "==> Step 5: Creating X startup script (~/.xinitrc)..."
-cat > ~/.xinitrc << XINITRC
-#!/bin/bash
-xset s off
-xset s noblank
-xset -dpms
-unclutter -idle 0 -root &
-
-# Send heartbeat every 30s so server knows we're alive
-(while true; do
-  curl -sf -X POST "$SERVER_URL/api/devices/$DEVICE_ID/heartbeat" \\
-    -H "Content-Type: application/json" \\
-    -d "{}" > /dev/null 2>&1
-  sleep 30
-done) &
-
-# Check adoption status - switch from pair page to display when adopted
-(while true; do
-  STATUS=\\$(curl -sf "$SERVER_URL/api/devices/pair?code=$PAIR_CODE" 2>/dev/null)
-  if echo "\\$STATUS" | python3 -c "import sys,json; d=json.load(sys.stdin); exit(0 if d.get('adopted') else 1)" 2>/dev/null; then
-    DNAME=\\$(echo "\\$STATUS" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))")
-    xdotool search --onlyvisible --class chromium key --window %@ ctrl+l
-    sleep 0.3
-    xdotool type --clearmodifiers "$SERVER_URL/display/\\$DNAME"
-    xdotool key --clearmodifiers Return
-    break
-  fi
-  sleep 5
-done) &
-
-exec chromium-browser \\
-  --kiosk \\
-  --noerrdialogs \\
-  --disable-infobars \\
-  --no-first-run \\
-  --disable-session-crashed-bubble \\
-  --autoplay-policy=no-user-gesture-required \\
-  --remote-debugging-port=9222 \\
-  --disable-translate \\
-  --overscroll-history-navigation=0 \\
-  --check-for-update-interval=31536000 \\
-  "$SERVER_URL/pair/$PAIR_CODE"
-XINITRC
-chmod +x ~/.xinitrc
-
-echo "==> Step 6: Configuring auto-start X on login..."
-if ! grep -q "startx" ~/.bash_profile 2>/dev/null; then
-  echo '[[ -z $DISPLAY && $XDG_VTNR -eq 1 ]] && startx >> ~/.startx.log 2>&1' >> ~/.bash_profile
-fi
-
-echo "==> Step 7: Configuring auto-login (tty1)..."
-sudo mkdir -p /etc/systemd/system/getty@tty1.service.d
-sudo tee /etc/systemd/system/getty@tty1.service.d/autologin.conf > /dev/null << AUTOLOGIN
-[Service]
-ExecStart=
-ExecStart=-/sbin/agetty --autologin $(whoami) --noclear %I \\$TERM
-AUTOLOGIN
-sudo systemctl daemon-reload
-
-echo ""
-echo "============================================="
-echo "  PiSignage Pro Setup Complete!"
-echo ""
-echo "  Pairing Code: $PAIR_CODE"
-echo ""
-echo "  Next steps:"
-echo "  1. Reboot this Pi"
-echo "  2. Go to: $SERVER_URL/admin/devices"
-echo "  3. Find 'Pending Adoption' and click 'Adopt Device'"
-echo "  4. Give it a name and assign a playlist"
-echo "============================================="
-echo ""
-read -p "Reboot now? (y/N) " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-  sudo reboot
-fi
-`;
 
   return new NextResponse(script, {
     headers: {

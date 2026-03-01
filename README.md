@@ -212,9 +212,37 @@ curl http://localhost:3100/api/stats/summary
 
 ---
 
-### 🔒 Optional: Set Up Nginx Reverse Proxy
+### 🔒 Optional: Nginx Proxy Manager (Recommended — if you already run NPM)
 
-If you want to run on port 80/443 or use a domain name:
+If you use [Nginx Proxy Manager](https://nginxproxymanager.com/) (the Docker-based GUI), create a proxy host as normal with one extra step:
+
+1. **Details tab:** Forward `pi.yourdomain.com` → `localhost:3100`
+2. **SSL tab:** Request Let's Encrypt cert as usual
+3. **Advanced tab:** Paste this custom config — **this is required for SSE to work:**
+
+```nginx
+proxy_http_version 1.1;
+proxy_set_header Upgrade $http_upgrade;
+proxy_set_header Connection 'upgrade';
+proxy_set_header Host $host;
+proxy_set_header X-Real-IP $remote_addr;
+proxy_set_header X-Forwarded-Proto $scheme;
+proxy_buffering off;
+proxy_read_timeout 86400;
+```
+
+> ⚠️ **`proxy_buffering off` and `proxy_read_timeout 86400` are critical.** Without them, nginx buffers the SSE stream and Pi displays never receive real-time commands (playlist changes, announcements, brightness). The connection also drops after 60s without the timeout.
+
+Once proxied, your Pi setup command becomes:
+```bash
+curl -sL https://pi.yourdomain.com/api/pi-setup | bash
+```
+
+---
+
+### 🔒 Optional: Set Up Nginx (bare metal) Reverse Proxy
+
+If you want to run on port 80/443 or use a domain name without NPM:
 
 ```bash
 sudo apt-get install -y nginx
