@@ -128,7 +128,41 @@ Open **http://YOUR_SERVER_IP:3000** in a browser — you should see the PiSignag
 
 ---
 
-### 🔒 Optional: Set Up Nginx Reverse Proxy
+### � Changing the Port (if 3000 is already in use)
+
+Port `3000` is the default. If something else is already running on it, change it in **three places**:
+
+**1. `package.json`** — update both the `start` script (production) and `dev` script:
+```json
+"dev": "next dev -p 3010",
+"start": "next start -p 3010",
+```
+
+**2. `ecosystem.config.js`** — update the args and PORT env var:
+```js
+args: 'start -p 3010',
+env: {
+  NODE_ENV: 'production',
+  PORT: '3010',
+},
+```
+
+**3. nginx `proxy_pass`** (if using nginx) — update the upstream port:
+```nginx
+proxy_pass http://localhost:3010;
+```
+
+Then rebuild and restart:
+```bash
+npm run build
+pm2 restart pisignage
+```
+
+> The Pi setup script at `/api/pi-setup` automatically bakes in the correct URL (including port) from the request headers — so if your server runs on port `3010`, the curl command becomes `curl -sL http://SERVER_IP:3010/api/pi-setup | bash` and everything works correctly.
+
+---
+
+### �🔒 Optional: Set Up Nginx Reverse Proxy
 
 If you want to run on port 80/443 or use a domain name:
 
@@ -182,31 +216,39 @@ sudo ufw reload
 
 ## 🍓 Part 2 — Raspberry Pi Zero 2W Setup
 
+> ### ✅ TL;DR — Yes, it really is just one command
+> Flash **Raspberry Pi OS Lite (64-bit)**, configure Wi-Fi in the Imager, boot it, SSH in, run `curl -sL http://YOUR_SERVER_IP:3000/api/pi-setup | bash`. The script does everything else. You do **not** need to install anything on the Pi manually.
+
 ### Requirements
 
 - Raspberry Pi Zero 2W
-- MicroSD card (8GB+ recommended)
-- Raspberry Pi OS Lite (64-bit) **or** Raspberry Pi OS Desktop
-- HDMI display connected
-- Internet access (Wi-Fi configured)
+- MicroSD card (8GB+ recommended, 16GB recommended for smooth operation)
+- **Raspberry Pi OS Lite (64-bit)** — use the Lite build, Desktop is not needed
+- HDMI display + mini-HDMI adapter
+- Internet access (Wi-Fi configured during flash)
 
 ### Step 1 — Flash the Pi
 
-1. Download [Raspberry Pi Imager](https://www.raspberrypi.com/software/)
-2. Choose: **Raspberry Pi Zero 2 W** → **Raspberry Pi OS Lite (64-bit)**
-3. Click the ⚙️ gear icon and configure:
-   - ✅ Set hostname (e.g. `display-lobby`)
-   - ✅ Enable SSH
-   - ✅ Set username/password (e.g. `pi` / your password)
-   - ✅ Configure Wi-Fi (SSID + password)
-   - ✅ Set locale/timezone
-4. Flash to SD card, insert into Pi, power on
+1. Download [Raspberry Pi Imager](https://www.raspberrypi.com/software/) on your computer
+2. Choose **Device:** Raspberry Pi Zero 2 W
+3. Choose **OS:** Raspberry Pi OS (other) → **Raspberry Pi OS Lite (64-bit)**
+4. Choose your SD card, then click **Next**
+5. When asked about OS customisation, click **Edit Settings** and configure:
+   - ✅ **Hostname:** e.g. `display-lobby`
+   - ✅ **Username/password:** e.g. `pi` / your password
+   - ✅ **Wi-Fi:** enter your SSID and password
+   - ✅ **Locale/timezone:** set your region
+   - Under **Services** tab: ✅ **Enable SSH** (use password authentication)
+6. Save and flash. Insert card into Pi and power on.
+
+> 💡 **First boot takes 1–2 minutes.** The Pi expands the filesystem and reboots once automatically before it's ready.
 
 ### Step 2 — SSH into the Pi
 
 ```bash
 ssh pi@display-lobby.local
-# or use the IP address if hostname doesn't resolve
+# If .local doesn't resolve, find the IP from your router and use:
+ssh pi@192.168.1.XXX
 ```
 
 ### Step 3 — Run the one-command setup
@@ -215,15 +257,21 @@ ssh pi@display-lobby.local
 curl -sL http://YOUR_SERVER_IP:3000/api/pi-setup | bash
 ```
 
-Replace `YOUR_SERVER_IP` with your server's local IP address (e.g. `192.168.1.100`).
+Replace `YOUR_SERVER_IP:3000` with your actual server address and port (e.g. `192.168.1.100:3000`). If you changed the port, use that port here too.
 
-**What this script does:**
-1. Updates package lists and installs Chromium browser, X11, and unclutter (hides mouse cursor)
-2. Registers the Pi with your PiSignage Pro server and receives a unique device ID + 6-digit pairing code
-3. Creates `~/.xinitrc` to launch Chromium in kiosk mode with `--remote-debugging-port=9222`
-4. Configures auto-login on `tty1`
-5. Configures auto-start of X11 on login
-6. The Pi will reboot when done (you can cancel the reboot if needed)
+**The script takes ~5 minutes and does ALL of this automatically:**
+1. Installs Chromium, X11, and unclutter (hides the mouse cursor)
+2. Registers this Pi with your server — gets a unique device ID + 6-digit pairing code
+3. Saves the device config to `~/.pisignage/`
+4. Writes `~/.xinitrc` to launch Chromium in full kiosk mode (no address bar, no cursor, no notifications)
+5. Enables `--remote-debugging-port=9222` on Chromium for server-side screenshot support
+6. Configures **auto-login** on `tty1` so no keyboard is needed after setup
+7. Configures **auto-start X11** on login so Chromium launches on every boot
+8. Prompts to reboot (say yes — or it tells you to reboot manually)
+
+**After reboot, the Pi will:**
+- Boot straight into Chromium showing a large pairing code on screen (no desktop, no taskbar)
+- Automatically navigate to the display page once you adopt it from the admin panel
 
 ### Step 4 — Note the pairing code
 
