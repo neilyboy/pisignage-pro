@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
 import type { PlannerEvent, KpiItem } from '@/lib/types';
+import { getTheme, DEFAULT_THEME, type DayTheme } from '@/lib/themes';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -37,7 +38,7 @@ const PRIORITY_CONFIG: Record<string, { label: string; color: string; icon: stri
 };
 
 // ─── Live Clock ───────────────────────────────────────────────────────────────
-function LiveClock() {
+function LiveClock({ theme }: { theme: DayTheme }) {
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
@@ -52,9 +53,9 @@ function LiveClock() {
 
   return (
     <div className="tabular-nums text-right leading-none">
-      <span className="text-6xl font-black text-white">{h12}:{m}</span>
-      <span className="text-3xl font-black text-blue-400 ml-1">{ampm}</span>
-      <span className="text-2xl text-gray-600 ml-2">{s}</span>
+      <span className="text-6xl font-black" style={{ color: theme.textPrimary }}>{h12}:{m}</span>
+      <span className="text-3xl font-black ml-1" style={{ color: theme.accent }}>{ampm}</span>
+      <span className="text-2xl ml-2" style={{ color: theme.clockSeconds }}>{s}</span>
     </div>
   );
 }
@@ -66,7 +67,7 @@ function formatHour(h: number): string {
 }
 
 // ─── Progress bar for the day timeline ───────────────────────────────────────
-function DayProgress({ nowH, startH, endH }: { nowH: number; startH: number; endH: number }) {
+function DayProgress({ nowH, startH, endH, theme }: { nowH: number; startH: number; endH: number; theme: DayTheme }) {
   const pct = Math.max(0, Math.min(100, ((nowH - startH) / (endH - startH)) * 100));
   const label = (() => {
     const remaining = endH - nowH;
@@ -84,24 +85,24 @@ function DayProgress({ nowH, startH, endH }: { nowH: number; startH: number; end
 
   return (
     <div className="space-y-1.5">
-      <div className="flex justify-between text-xs font-bold uppercase tracking-widest text-gray-500">
+      <div className="flex justify-between text-xs font-bold uppercase tracking-widest" style={{ color: theme.textMuted }}>
         <span>{formatHour(startH)}</span>
-        <span className="text-blue-400">{label}</span>
+        <span style={{ color: theme.accent }}>{label}</span>
         <span>{formatHour(endH)}</span>
       </div>
-      <div className="w-full bg-white/5 rounded-full h-2 relative">
-        <div className="h-2 rounded-full bg-gradient-to-r from-blue-600 to-blue-400 transition-all"
-          style={{ width: `${pct}%` }} />
-        <div className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white border-2 border-blue-400 shadow-lg shadow-blue-400/50"
-          style={{ left: `calc(${pct}% - 6px)` }} />
+      <div className="w-full rounded-full h-2 relative" style={{ backgroundColor: theme.progressBg }}>
+        <div className="h-2 rounded-full transition-all"
+          style={{ width: `${pct}%`, background: theme.progressFill }} />
+        <div className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2"
+          style={{ left: `calc(${pct}% - 6px)`, backgroundColor: theme.textPrimary, borderColor: theme.accent, boxShadow: `0 0 8px ${theme.accent}80` }} />
       </div>
     </div>
   );
 }
 
 // ─── Proportional timeline ────────────────────────────────────────────────────
-function TimelineView({ events, nowH, workStart, workEnd }: {
-  events: PlannerEvent[]; nowH: number; workStart: number; workEnd: number;
+function TimelineView({ events, nowH, workStart, workEnd, theme }: {
+  events: PlannerEvent[]; nowH: number; workStart: number; workEnd: number; theme: DayTheme;
 }) {
   const daySpan = workEnd - workStart;
   if (daySpan <= 0) return null;
@@ -122,17 +123,17 @@ function TimelineView({ events, nowH, workStart, workEnd }: {
           const pct = ((h - workStart) / daySpan) * 100;
           const label = h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`;
           return (
-            <div key={h} className="absolute right-2 -translate-y-1/2 text-[10px] font-bold text-gray-600 tabular-nums"
-              style={{ top: `${pct}%` }}>
+            <div key={h} className="absolute right-2 -translate-y-1/2 text-[10px] font-bold tabular-nums"
+              style={{ top: `${pct}%`, color: theme.textMuted }}>
               {label}
             </div>
           );
         })}
         {/* Work start / end labels */}
-        <div className="absolute right-2 text-[10px] font-bold text-blue-500" style={{ top: '0%' }}>
+        <div className="absolute right-2 text-[10px] font-bold" style={{ top: '0%', color: theme.accent }}>
           {workStart % 1 === 0 ? `${workStart === 0 ? 12 : workStart > 12 ? workStart - 12 : workStart}${workStart < 12 ? 'a' : 'p'}` : formatTime12(`${Math.floor(workStart)}:${String(Math.round((workStart % 1) * 60)).padStart(2, '0')}`)}
         </div>
-        <div className="absolute right-2 -translate-y-full text-[10px] font-bold text-blue-500" style={{ top: '100%' }}>
+        <div className="absolute right-2 -translate-y-full text-[10px] font-bold" style={{ top: '100%', color: theme.accent }}>
           {workEnd % 1 === 0 ? `${workEnd === 0 ? 12 : workEnd > 12 ? workEnd - 12 : workEnd}${workEnd < 12 ? 'a' : 'p'}` : formatTime12(`${Math.floor(workEnd)}:${String(Math.round((workEnd % 1) * 60)).padStart(2, '0')}`)}
         </div>
       </div>
@@ -143,7 +144,7 @@ function TimelineView({ events, nowH, workStart, workEnd }: {
         {ticks.map(h => {
           const pct = ((h - workStart) / daySpan) * 100;
           return (
-            <div key={h} className="absolute left-0 right-0 border-t border-white/5" style={{ top: `${pct}%` }} />
+            <div key={h} className="absolute left-0 right-0 border-t" style={{ top: `${pct}%`, borderColor: theme.gridLine }} />
           );
         })}
 
@@ -151,8 +152,8 @@ function TimelineView({ events, nowH, workStart, workEnd }: {
         {isWorkDay && (
           <div className="absolute left-0 right-0 z-20" style={{ top: `${nowPct}%` }}>
             <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-blue-400 flex-shrink-0" style={{ marginLeft: '-4px' }} />
-              <div className="flex-1 border-t-2 border-blue-400/80 border-dashed" />
+              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ marginLeft: '-4px', backgroundColor: theme.nowLine }} />
+              <div className="flex-1 border-t-2 border-dashed" style={{ borderColor: theme.nowLine + 'cc' }} />
             </div>
           </div>
         )}
@@ -193,7 +194,7 @@ function TimelineView({ events, nowH, workStart, workEnd }: {
                 <div className="flex-shrink-0 mt-0.5 w-2 h-2 rounded-full" style={{ backgroundColor: ev.color }} />
                 <div className="flex-1 min-w-0 overflow-hidden">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className={`font-black text-white truncate ${isShort ? 'text-xs' : isActive ? 'text-base' : 'text-sm'}`}>
+                    <span className={`font-black truncate ${isShort ? 'text-xs' : isActive ? 'text-base' : 'text-sm'}`} style={{ color: theme.textPrimary }}>
                       {ev.title}
                     </span>
                     {isActive && !isShort && (
@@ -203,7 +204,7 @@ function TimelineView({ events, nowH, workStart, workEnd }: {
                   </div>
                   {!isShort && (
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                      <span className="text-[10px] font-bold text-gray-400">
+                      <span className="text-[10px] font-bold" style={{ color: theme.textMuted }}>
                         {formatTime12(ev.start_time)} – {formatTime12(ev.end_time)}
                       </span>
                       <span className="text-[10px] font-bold px-1 py-0.5 rounded"
@@ -219,7 +220,7 @@ function TimelineView({ events, nowH, workStart, workEnd }: {
                     </div>
                   )}
                   {ev.notes && !isShort && heightPct > 15 && (
-                    <div className="text-[10px] text-gray-500 mt-1 truncate">{ev.notes}</div>
+                    <div className="text-[10px] mt-1 truncate" style={{ color: theme.textMuted }}>{ev.notes}</div>
                   )}
                 </div>
                 {/* Duration badge — far right for non-short */}
@@ -273,8 +274,9 @@ export default function DayWidget() {
   const [events, setEvents] = useState<PlannerEvent[]>([]);
   const [kpis, setKpis] = useState<KpiItem[]>([]);
   const [now, setNow] = useState(new Date());
-  const [workStart, setWorkStart] = useState(8);   // default 8am
-  const [workEnd, setWorkEnd] = useState(17);      // default 5pm
+  const [workStart, setWorkStart] = useState(8);
+  const [workEnd, setWorkEnd] = useState(17);
+  const [theme, setTheme] = useState<DayTheme>(DEFAULT_THEME);
 
   const load = useCallback(() => {
     fetch(`/api/planner?today=1`).then(r => r.json()).then(d => {
@@ -290,6 +292,7 @@ export default function DayWidget() {
         const [h, m] = s.work_end.split(':').map(Number);
         setWorkEnd(h + m / 60);
       }
+      setTheme(getTheme(s.display_theme ?? 'midnight', s.display_theme_custom));
     }).catch(() => {});
   }, []);
 
@@ -309,36 +312,36 @@ export default function DayWidget() {
 
   return (
     <div className="w-full h-full flex flex-col overflow-hidden"
-      style={{ background: 'linear-gradient(160deg, #060b18 0%, #0a0f1e 60%, #060d14 100%)', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+      style={{ background: theme.bgGradient, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <div className="flex-shrink-0 px-8 pt-6 pb-4 flex items-start justify-between border-b" style={{ borderColor: '#1e2d4a' }}>
+      <div className="flex-shrink-0 px-8 pt-6 pb-4 flex items-start justify-between border-b" style={{ borderColor: theme.headerBorder }}>
         <div>
-          <div className="text-xs font-black uppercase tracking-[0.4em] text-blue-400 mb-1">Daily Operations</div>
-          <div className="text-4xl font-black text-white leading-none">{dateLabel}</div>
+          <div className="text-xs font-black uppercase tracking-[0.4em] mb-1" style={{ color: theme.accent }}>Daily Operations</div>
+          <div className="text-4xl font-black leading-none" style={{ color: theme.textPrimary }}>{dateLabel}</div>
           <div className="flex items-center gap-4 mt-3">
             <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-blue-400" />
-              <span className="text-sm font-bold text-gray-400">{sorted.length} events</span>
+              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: theme.accent }} />
+              <span className="text-sm font-bold" style={{ color: theme.textMuted }}>{sorted.length} events</span>
             </div>
             {activeCount > 0 && (
               <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                <div className="w-2 h-2 rounded-full animate-pulse bg-green-400" />
                 <span className="text-sm font-bold text-green-400">{activeCount} active now</span>
               </div>
             )}
             <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-gray-600" />
-              <span className="text-sm font-bold text-gray-500">{doneCount} completed</span>
+              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: theme.textMuted }} />
+              <span className="text-sm font-bold" style={{ color: theme.textMuted }}>{doneCount} completed</span>
             </div>
           </div>
         </div>
-        <LiveClock />
+        <LiveClock theme={theme} />
       </div>
 
       {/* ── Day progress bar ─────────────────────────────────────────────────── */}
-      <div className="flex-shrink-0 px-8 py-3 border-b" style={{ borderColor: '#1e2d4a' }}>
-        <DayProgress nowH={nowH} startH={workStart} endH={workEnd} />
+      <div className="flex-shrink-0 px-8 py-3 border-b" style={{ borderColor: theme.headerBorder }}>
+        <DayProgress nowH={nowH} startH={workStart} endH={workEnd} theme={theme} />
       </div>
 
       {/* ── Timeline ────────────────────────────────────────────────────────── */}
@@ -346,8 +349,8 @@ export default function DayWidget() {
         {sorted.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center gap-4">
             <div className="text-8xl">📋</div>
-            <div className="text-2xl font-black text-gray-600 uppercase tracking-widest">Nothing scheduled today</div>
-            <div className="text-gray-700 text-sm">Add events in the Weekly Planner</div>
+            <div className="text-2xl font-black uppercase tracking-widest" style={{ color: theme.textMuted }}>Nothing scheduled today</div>
+            <div className="text-sm" style={{ color: theme.textMuted }}>Add events in the Weekly Planner</div>
           </div>
         ) : (
           <div className="h-full">
@@ -356,6 +359,7 @@ export default function DayWidget() {
               nowH={nowH}
               workStart={workStart}
               workEnd={workEnd}
+              theme={theme}
             />
           </div>
         )}
@@ -363,7 +367,7 @@ export default function DayWidget() {
 
       {/* ── KPI Strip ───────────────────────────────────────────────────────── */}
       {kpis.length > 0 && (
-        <div className="flex-shrink-0 px-8 pb-4 pt-2 border-t" style={{ borderColor: '#1e2d4a' }}>
+        <div className="flex-shrink-0 px-8 pb-4 pt-2 border-t" style={{ borderColor: theme.headerBorder }}>
           <KpiStrip kpis={kpis} />
         </div>
       )}

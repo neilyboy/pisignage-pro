@@ -1,7 +1,8 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { Copy, Check, Terminal, Download, Upload, Image as ImageIcon, Clock, Save, Monitor, RefreshCw, Wifi, WifiOff, Activity, Settings2, ChevronDown, ChevronRight } from 'lucide-react';
+import { Copy, Check, Terminal, Download, Upload, Image as ImageIcon, Clock, Save, Monitor, RefreshCw, Wifi, WifiOff, Activity, Settings2, ChevronDown, ChevronRight, Palette } from 'lucide-react';
 import type { Device } from '@/lib/types';
+import { THEMES, type DayTheme } from '@/lib/themes';
 
 export default function SettingsPage() {
   const [copied, setCopied] = useState<string | null>(null);
@@ -13,6 +14,8 @@ export default function SettingsPage() {
   const [brandSize, setBrandSize] = useState('120');
   const [workStart, setWorkStart] = useState('08:00');
   const [workEnd, setWorkEnd] = useState('17:00');
+  const [activeThemeId, setActiveThemeId] = useState('midnight');
+  const [customTheme, setCustomTheme] = useState<Partial<DayTheme>>({});
   const [uploading, setUploading] = useState(false);
   const logoFileRef = useRef<HTMLInputElement>(null);
   const [devices, setDevices] = useState<Device[]>([]);
@@ -73,6 +76,8 @@ export default function SettingsPage() {
           brand_size: brandSize,
           work_start: workStart,
           work_end: workEnd,
+          display_theme: activeThemeId,
+          display_theme_custom: JSON.stringify(customTheme),
         }),
       });
       logPush('Settings pushed to all displays', true);
@@ -90,6 +95,8 @@ export default function SettingsPage() {
       setBrandSize(s.brand_size ?? '120');
       setWorkStart(s.work_start ?? '08:00');
       setWorkEnd(s.work_end ?? '17:00');
+      setActiveThemeId(s.display_theme ?? 'midnight');
+      if (s.display_theme_custom) { try { setCustomTheme(JSON.parse(s.display_theme_custom)); } catch {} }
     });
     loadDevices();
     const t = setInterval(loadDevices, 15000);
@@ -108,6 +115,8 @@ export default function SettingsPage() {
         brand_size: brandSize,
         work_start: workStart,
         work_end: workEnd,
+        display_theme: activeThemeId,
+        display_theme_custom: JSON.stringify(customTheme),
       }),
     });
     setSaving(false);
@@ -335,6 +344,133 @@ sudo reboot`;
             })()}
           </div>
         </div>
+      </div>
+
+      {/* ── Display Theme ────────────────────────────────────────────────────── */}
+      <div className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-2xl p-6 space-y-5">
+        <div className="flex items-center gap-2">
+          <Palette className="w-5 h-5 text-pink-400" />
+          <h2 className="font-semibold text-white text-lg">Display Theme</h2>
+        </div>
+        <p className="text-sm text-[hsl(var(--muted-foreground))]">Controls the look of the Daily View and Calendar shown on your displays.</p>
+
+        {/* Preset grid */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {THEMES.filter(t => t.id !== 'custom').map(theme => {
+            const isActive = activeThemeId === theme.id;
+            // Extract first/last color from gradient for swatch
+            const swatchA = theme.bgGradient.match(/#[0-9a-fA-F]{6}/g)?.[0] ?? '#000';
+            const swatchB = theme.bgGradient.match(/#[0-9a-fA-F]{6}/g)?.[1] ?? swatchA;
+            return (
+              <button key={theme.id} onClick={() => setActiveThemeId(theme.id)}
+                className={`relative rounded-xl overflow-hidden border-2 transition-all text-left ${
+                  isActive ? 'border-blue-500 ring-2 ring-blue-500/30' : 'border-transparent hover:border-white/20'
+                }`}>
+                {/* Mini preview */}
+                <div className="h-20 relative" style={{ background: theme.bgGradient }}>
+                  {/* Simulated header bar */}
+                  <div className="absolute top-2 left-2 right-2 h-1.5 rounded-full opacity-40"
+                    style={{ backgroundColor: theme.accent }} />
+                  {/* Simulated event blocks */}
+                  <div className="absolute left-5 right-2 rounded-md" style={{
+                    top: '28%', height: '20%',
+                    backgroundColor: theme.accent + '40',
+                    borderLeft: `3px solid ${theme.accent}`,
+                  }} />
+                  <div className="absolute left-5 right-2 rounded-md" style={{
+                    top: '56%', height: '28%',
+                    backgroundColor: theme.accent + '25',
+                    borderLeft: `3px solid ${theme.accent}80`,
+                  }} />
+                  {/* Now line */}
+                  <div className="absolute left-3 right-0" style={{ top: '50%', borderTop: `1.5px dashed ${theme.nowLine}90` }} />
+                  {/* Accent dot */}
+                  <div className="absolute w-2 h-2 rounded-full" style={{
+                    top: 'calc(50% - 4px)', left: '10px', backgroundColor: theme.accent,
+                  }} />
+                  {/* Gradient swatch strip */}
+                  <div className="absolute bottom-0 left-0 right-0 h-1"
+                    style={{ background: `linear-gradient(to right, ${swatchA}, ${swatchB})` }} />
+                  {isActive && (
+                    <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center">
+                      <Check className="w-2.5 h-2.5 text-white" />
+                    </div>
+                  )}
+                </div>
+                <div className="px-2 py-1.5" style={{ backgroundColor: swatchA }}>
+                  <span className="text-xs font-bold" style={{ color: theme.textPrimary }}>{theme.name}</span>
+                </div>
+              </button>
+            );
+          })}
+
+          {/* Custom tile */}
+          <button onClick={() => setActiveThemeId('custom')}
+            className={`relative rounded-xl overflow-hidden border-2 transition-all text-left ${
+              activeThemeId === 'custom' ? 'border-pink-500 ring-2 ring-pink-500/30' : 'border-transparent hover:border-white/20'
+            }`}>
+            <div className="h-20 bg-gradient-to-br from-pink-900/40 via-purple-900/40 to-blue-900/40 flex items-center justify-center">
+              <Palette className="w-7 h-7 text-pink-400 opacity-70" />
+              {activeThemeId === 'custom' && (
+                <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-pink-500 flex items-center justify-center">
+                  <Check className="w-2.5 h-2.5 text-white" />
+                </div>
+              )}
+            </div>
+            <div className="px-2 py-1.5 bg-[hsl(var(--secondary))]">
+              <span className="text-xs font-bold text-pink-300">Custom</span>
+            </div>
+          </button>
+        </div>
+
+        {/* Custom color controls — shown only when Custom is selected */}
+        {activeThemeId === 'custom' && (
+          <div className="border border-pink-500/20 rounded-xl p-4 space-y-4 bg-pink-500/5">
+            <div className="text-xs font-bold uppercase tracking-widest text-pink-400 mb-2">Custom Colors</div>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
+              {(
+                [
+                  { key: 'bgGradient',    label: 'Background',       type: 'text',  placeholder: 'CSS gradient or color' },
+                  { key: 'accent',        label: 'Accent / Now Line', type: 'color', placeholder: '' },
+                  { key: 'textPrimary',   label: 'Primary Text',      type: 'color', placeholder: '' },
+                  { key: 'textSecondary', label: 'Secondary Text',    type: 'color', placeholder: '' },
+                  { key: 'textMuted',     label: 'Muted Text',        type: 'color', placeholder: '' },
+                  { key: 'headerBorder',  label: 'Divider Color',     type: 'color', placeholder: '' },
+                  { key: 'progressFill',  label: 'Progress Bar Fill', type: 'text',  placeholder: 'CSS gradient or color' },
+                  { key: 'gridLine',      label: 'Grid Lines',        type: 'text',  placeholder: 'rgba(255,255,255,0.05)' },
+                  { key: 'nowLine',       label: 'Now Line',          type: 'color', placeholder: '' },
+                ] as { key: keyof DayTheme; label: string; type: string; placeholder: string }[]
+              ).map(({ key, label, type, placeholder }) => {
+                const baseTheme = THEMES.find(t => t.id === 'midnight')!;
+                const currentVal = (customTheme[key] ?? baseTheme[key]) as string;
+                return (
+                  <div key={key} className="space-y-1">
+                    <label className="text-xs text-[hsl(var(--muted-foreground))]">{label}</label>
+                    <div className="flex items-center gap-2">
+                      {type === 'color' ? (
+                        <>
+                          <input type="color" value={currentVal.startsWith('#') ? currentVal : '#60a5fa'}
+                            onChange={e => setCustomTheme(p => ({ ...p, [key]: e.target.value }))}
+                            className="w-8 h-8 rounded cursor-pointer border border-[hsl(var(--border))] bg-transparent p-0.5" />
+                          <input type="text" value={currentVal}
+                            onChange={e => setCustomTheme(p => ({ ...p, [key]: e.target.value }))}
+                            className="flex-1 bg-[hsl(var(--input))] border border-[hsl(var(--border))] text-white text-xs px-2 py-1.5 rounded-lg outline-none focus:border-pink-500 font-mono" />
+                        </>
+                      ) : (
+                        <input type="text" value={currentVal} placeholder={placeholder}
+                          onChange={e => setCustomTheme(p => ({ ...p, [key]: e.target.value }))}
+                          className="w-full bg-[hsl(var(--input))] border border-[hsl(var(--border))] text-white text-xs px-2 py-1.5 rounded-lg outline-none focus:border-pink-500 font-mono" />
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="text-xs text-[hsl(var(--muted-foreground))] pt-1">
+              Changes preview live on displays after you <strong className="text-white">Save Settings</strong>.
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Device Tools ─────────────────────────────────────────────────────── */}
