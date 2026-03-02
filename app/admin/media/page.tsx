@@ -468,8 +468,8 @@ export default function MediaPage() {
                 <span className="text-sm text-[hsl(var(--muted-foreground))]">Type</span>
                 <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
                   className="w-full bg-[hsl(var(--input))] border border-[hsl(var(--border))] text-white px-3 py-2 rounded-lg text-sm outline-none">
-                  {['image', 'video', 'webpage', 'text', 'html', 'clock', 'planner', 'planner-day', 'weather'].map(t => {
-                    const labels: Record<string,string> = { 'planner': 'Weekly Planner', 'planner-day': 'Daily View', 'weather': 'Weather Widget' };
+                  {['image', 'video', 'webpage', 'text', 'html', 'clock', 'planner', 'planner-day', 'weather', 'week-glance', 'job-pipeline'].map(t => {
+                    const labels: Record<string,string> = { 'planner': 'Weekly Planner', 'planner-day': 'Daily View', 'weather': 'Weather Widget', 'week-glance': 'Week at a Glance', 'job-pipeline': 'Job Pipeline' };
                     return <option key={t} value={t}>{labels[t] ?? t.charAt(0).toUpperCase() + t.slice(1)}</option>;
                   })}
                 </select>

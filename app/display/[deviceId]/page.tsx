@@ -5,6 +5,8 @@ import type { Playlist, Asset } from '@/lib/types';
 import PlannerWidget from '@/components/PlannerWidget';
 import DayWidget from '@/components/DayWidget';
 import WeatherWidget from '@/components/WeatherWidget';
+import WeekGlanceWidget from '@/components/WeekGlanceWidget';
+import JobPipelineWidget from '@/components/JobPipelineWidget';
 
 interface BrandSettings {
   brand_enabled: string;
@@ -193,6 +195,10 @@ export default function DisplayPage() {
         return <DayWidget />;
       case 'weather':
         return <WeatherWidget />;
+      case 'week-glance':
+        return <WeekGlanceWidget />;
+      case 'job-pipeline':
+        return <JobPipelineWidget />;
       default:
         return <div className="w-full h-full bg-black flex items-center justify-center text-white">{asset.name}</div>;
     }

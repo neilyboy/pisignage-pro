@@ -141,6 +141,36 @@ function getDb(): Database.Database {
 
   CREATE INDEX IF NOT EXISTS idx_planner_date ON planner_events(date);
 
+  CREATE TABLE IF NOT EXISTS job_cards (
+    id TEXT PRIMARY KEY,
+    week_start TEXT NOT NULL,
+    day TEXT NOT NULL,
+    job_name TEXT NOT NULL,
+    location TEXT DEFAULT '',
+    description TEXT DEFAULT '',
+    techs TEXT DEFAULT '[]',
+    color TEXT DEFAULT '#3b82f6',
+    position INTEGER DEFAULT 0,
+    created_at INTEGER DEFAULT (unixepoch()),
+    updated_at INTEGER DEFAULT (unixepoch())
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_job_cards_week ON job_cards(week_start);
+
+  CREATE TABLE IF NOT EXISTS job_pipeline (
+    id TEXT PRIMARY KEY,
+    job_name TEXT NOT NULL,
+    client TEXT DEFAULT '',
+    location TEXT DEFAULT '',
+    stage TEXT NOT NULL DEFAULT 'walkthru-req',
+    hours REAL DEFAULT 0,
+    notes TEXT DEFAULT '',
+    color TEXT DEFAULT '#3b82f6',
+    position INTEGER DEFAULT 0,
+    created_at INTEGER DEFAULT (unixepoch()),
+    updated_at INTEGER DEFAULT (unixepoch())
+  );
+
   CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL

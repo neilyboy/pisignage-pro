@@ -1,5 +1,5 @@
 export type DeviceStatus = 'pending' | 'active' | 'offline';
-export type AssetType = 'image' | 'video' | 'webpage' | 'youtube' | 'text' | 'html' | 'clock' | 'weather' | 'planner' | 'planner-day';
+export type AssetType = 'image' | 'video' | 'webpage' | 'youtube' | 'text' | 'html' | 'clock' | 'weather' | 'planner' | 'planner-day' | 'week-glance' | 'job-pipeline';
 export type Transition = 'fade' | 'slide' | 'zoom' | 'none';
 
 export interface Device {
@@ -117,6 +117,36 @@ export interface KpiItem {
   color: string;
   data: Array<{ label: string; value: number }>;
   notes: string | null;
+  position: number;
+  created_at: number;
+  updated_at: number;
+}
+
+export type PipelineStage = 'walkthru-req' | 'quote' | 'forecast' | 'won' | 'on-hold';
+
+export interface JobCard {
+  id: string;
+  week_start: string;
+  day: string;
+  job_name: string;
+  location: string;
+  description: string;
+  techs: string[];
+  color: string;
+  position: number;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface JobPipelineItem {
+  id: string;
+  job_name: string;
+  client: string;
+  location: string;
+  stage: PipelineStage;
+  hours: number;
+  notes: string;
+  color: string;
   position: number;
   created_at: number;
   updated_at: number;

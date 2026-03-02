@@ -61,9 +61,12 @@ function LiveClock({ theme }: { theme: DayTheme }) {
 }
 
 function formatHour(h: number): string {
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  const h12 = h % 12 || 12;
-  return `${h12} ${ampm}`;
+  const totalMins = Math.round(h * 60);
+  const hrs = Math.floor(totalMins / 60);
+  const mins = totalMins % 60;
+  const ampm = hrs >= 12 ? 'PM' : 'AM';
+  const h12 = hrs % 12 || 12;
+  return mins === 0 ? `${h12} ${ampm}` : `${h12}:${String(mins).padStart(2, '0')} ${ampm}`;
 }
 
 // ─── Progress bar for the day timeline ───────────────────────────────────────
@@ -131,10 +134,10 @@ function TimelineView({ events, nowH, workStart, workEnd, theme }: {
         })}
         {/* Work start / end labels */}
         <div className="absolute right-2 text-[10px] font-bold" style={{ top: '0%', color: theme.accent }}>
-          {workStart % 1 === 0 ? `${workStart === 0 ? 12 : workStart > 12 ? workStart - 12 : workStart}${workStart < 12 ? 'a' : 'p'}` : formatTime12(`${Math.floor(workStart)}:${String(Math.round((workStart % 1) * 60)).padStart(2, '0')}`)}
+          {formatHour(workStart)}
         </div>
         <div className="absolute right-2 -translate-y-full text-[10px] font-bold" style={{ top: '100%', color: theme.accent }}>
-          {workEnd % 1 === 0 ? `${workEnd === 0 ? 12 : workEnd > 12 ? workEnd - 12 : workEnd}${workEnd < 12 ? 'a' : 'p'}` : formatTime12(`${Math.floor(workEnd)}:${String(Math.round((workEnd % 1) * 60)).padStart(2, '0')}`)}
+          {formatHour(workEnd)}
         </div>
       </div>
 

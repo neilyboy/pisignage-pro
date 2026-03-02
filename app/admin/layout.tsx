@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Monitor, Image, ListVideo, Calendar, Bell, BarChart2,
-  Settings, Tv2, Layers, CalendarDays
+  Settings, Tv2, Layers, CalendarDays, LayoutGrid, Briefcase
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -14,6 +14,8 @@ const nav = [
   { href: '/admin/playlists', label: 'Playlists', icon: ListVideo },
   { href: '/admin/schedule', label: 'Schedule', icon: Calendar },
   { href: '/admin/planner', label: 'Weekly Planner', icon: CalendarDays },
+  { href: '/admin/week-glance', label: 'Week at a Glance', icon: LayoutGrid },
+  { href: '/admin/job-pipeline', label: 'Job Pipeline', icon: Briefcase },
   { href: '/admin/announcements', label: 'Announcements', icon: Bell },
   { href: '/admin/analytics', label: 'Analytics', icon: BarChart2 },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
