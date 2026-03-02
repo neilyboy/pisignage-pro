@@ -220,6 +220,7 @@ export default function PlannerPage() {
   const [kpiDataInput, setKpiDataInput] = useState('');
 
   const gridRef = useRef<HTMLDivElement>(null);
+  const [workStartHour, setWorkStartHour] = useState(7); // default: scroll to 7 AM until settings load
 
   // ── Week dates ──────────────────────────────────────────────────────────────
   const weekDates = Array.from({ length: 7 }, (_, i) => {
@@ -242,9 +243,25 @@ export default function PlannerPage() {
   }, []);
 
   useEffect(() => {
+    fetch('/api/settings').then(r => r.json()).then((s: Record<string, string>) => {
+      if (s.work_start) {
+        const [h] = s.work_start.split(':').map(Number);
+        setWorkStartHour(h);
+      }
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
     setLoading(true);
     Promise.all([loadEvents(), loadKpis()]).finally(() => setLoading(false));
   }, [loadEvents, loadKpis]);
+
+  // Scroll to work start hour whenever the grid is ready or work start changes
+  useEffect(() => {
+    if (!gridRef.current) return;
+    const scrollTarget = Math.max(0, (workStartHour - 0.5) * HOUR_HEIGHT);
+    gridRef.current.scrollTop = scrollTarget;
+  }, [workStartHour, loading]);
 
   // ── Navigation ──────────────────────────────────────────────────────────────
   const prevWeek = () => { const d = new Date(weekStart); d.setDate(d.getDate() - 7); setWeekStart(getSundayOfWeek(d)); };
