@@ -140,6 +140,19 @@ function getDb(): Database.Database {
   );
 
   CREATE INDEX IF NOT EXISTS idx_planner_date ON planner_events(date);
+
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
+
+  INSERT OR IGNORE INTO settings (key, value) VALUES
+    ('brand_logo_url', ''),
+    ('brand_position', 'bottom-right'),
+    ('brand_size', '120'),
+    ('brand_enabled', 'false'),
+    ('work_start', '08:00'),
+    ('work_end', '17:00');
 `);
   return _db;
 }

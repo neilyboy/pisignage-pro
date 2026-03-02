@@ -1,9 +1,59 @@
 'use client';
-import { useState } from 'react';
-import { Copy, Check, Terminal, Download } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Copy, Check, Terminal, Download, Upload, Image as ImageIcon, Clock, Save } from 'lucide-react';
 
 export default function SettingsPage() {
   const [copied, setCopied] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [brandEnabled, setBrandEnabled] = useState(false);
+  const [brandLogoUrl, setBrandLogoUrl] = useState('');
+  const [brandPosition, setBrandPosition] = useState('bottom-right');
+  const [brandSize, setBrandSize] = useState('120');
+  const [workStart, setWorkStart] = useState('08:00');
+  const [workEnd, setWorkEnd] = useState('17:00');
+  const [uploading, setUploading] = useState(false);
+  const logoFileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetch('/api/settings').then(r => r.json()).then((s: Record<string, string>) => {
+      setBrandEnabled(s.brand_enabled === 'true');
+      setBrandLogoUrl(s.brand_logo_url ?? '');
+      setBrandPosition(s.brand_position ?? 'bottom-right');
+      setBrandSize(s.brand_size ?? '120');
+      setWorkStart(s.work_start ?? '08:00');
+      setWorkEnd(s.work_end ?? '17:00');
+    });
+  }, []);
+
+  const saveSettings = async () => {
+    setSaving(true);
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        brand_enabled: String(brandEnabled),
+        brand_logo_url: brandLogoUrl,
+        brand_position: brandPosition,
+        brand_size: brandSize,
+        work_start: workStart,
+        work_end: workEnd,
+      }),
+    });
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  };
+
+  const uploadLogo = async (file: File) => {
+    setUploading(true);
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch('/api/upload', { method: 'POST', body: fd });
+    const { url } = await res.json();
+    setBrandLogoUrl(url);
+    setUploading(false);
+  };
 
   const copy = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
@@ -93,10 +143,133 @@ sudo reboot`;
     </div>
   );
 
+  const POSITIONS = [
+    { value: 'top-left',     label: 'Top Left' },
+    { value: 'top-right',    label: 'Top Right' },
+    { value: 'bottom-left',  label: 'Bottom Left' },
+    { value: 'bottom-right', label: 'Bottom Right' },
+  ];
+
   return (
     <div className="p-6 space-y-8 max-w-3xl">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Settings</h1>
+          <p className="text-sm text-[hsl(var(--muted-foreground))]">Branding, work hours, and Pi setup</p>
+        </div>
+        <button onClick={saveSettings} disabled={saving}
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-5 py-2.5 rounded-lg font-medium">
+          {saved ? <><Check className="w-4 h-4 text-green-300" /> Saved!</> : saving ? 'Saving…' : <><Save className="w-4 h-4" /> Save Settings</>}
+        </button>
+      </div>
+
+      {/* ── Branding ─────────────────────────────────────────────────────────── */}
+      <div className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-2xl p-6 space-y-5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ImageIcon className="w-5 h-5 text-blue-400" />
+            <h2 className="font-semibold text-white text-lg">Branding / Logo Overlay</h2>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <span className="text-sm text-[hsl(var(--muted-foreground))]">Show on screen</span>
+            <div onClick={() => setBrandEnabled(e => !e)}
+              className={`w-11 h-6 rounded-full relative transition-colors ${brandEnabled ? 'bg-blue-600' : 'bg-gray-700'}`}>
+              <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${brandEnabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            </div>
+          </label>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          {/* Logo upload */}
+          <div className="col-span-2 space-y-2">
+            <label className="text-sm text-[hsl(var(--muted-foreground))]">Logo Image (PNG with transparency recommended)</label>
+            <div className="flex items-center gap-3">
+              <button onClick={() => logoFileRef.current?.click()} disabled={uploading}
+                className="flex items-center gap-2 border border-[hsl(var(--border))] hover:border-blue-500 text-[hsl(var(--muted-foreground))] hover:text-white px-3 py-2 rounded-lg text-sm transition-colors">
+                <Upload className="w-4 h-4" /> {uploading ? 'Uploading…' : 'Upload Logo'}
+              </button>
+              <input ref={logoFileRef} type="file" accept="image/*" className="hidden"
+                onChange={e => e.target.files?.[0] && uploadLogo(e.target.files[0])} />
+              {brandLogoUrl && (
+                <div className="flex items-center gap-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={brandLogoUrl} alt="logo preview" className="h-10 object-contain rounded border border-[hsl(var(--border))] bg-gray-800 px-2" />
+                  <span className="text-xs text-green-400 truncate max-w-[180px]">{brandLogoUrl.split('/').pop()}</span>
+                  <button onClick={() => setBrandLogoUrl('')} className="text-xs text-red-400 hover:text-red-300">✕ Remove</button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Position */}
+          <div className="space-y-2">
+            <label className="text-sm text-[hsl(var(--muted-foreground))]">Screen Position</label>
+            <div className="grid grid-cols-2 gap-2">
+              {POSITIONS.map(p => (
+                <button key={p.value} onClick={() => setBrandPosition(p.value)}
+                  className={`py-2 px-3 rounded-lg text-sm font-medium border transition-colors ${brandPosition === p.value ? 'bg-blue-600 border-blue-500 text-white' : 'border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:text-white hover:border-blue-500'}`}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Size + Preview */}
+          <div className="space-y-2">
+            <label className="text-sm text-[hsl(var(--muted-foreground))]">Logo Size: <span className="text-white font-bold">{brandSize}px</span></label>
+            <input type="range" min="40" max="400" step="10" value={brandSize}
+              onChange={e => setBrandSize(e.target.value)}
+              className="w-full accent-blue-500" />
+            <div className="text-xs text-[hsl(var(--muted-foreground))]">40px (small) → 400px (large)</div>
+            {/* Mini preview */}
+            {brandLogoUrl && (
+              <div className="relative bg-gray-900 rounded-lg border border-[hsl(var(--border))] overflow-hidden mt-2"
+                style={{ height: '90px', aspectRatio: '16/9' }}>
+                <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-700">Screen Preview</div>
+                <div className={`absolute p-2 ${brandPosition === 'top-left' ? 'top-0 left-0' : brandPosition === 'top-right' ? 'top-0 right-0' : brandPosition === 'bottom-left' ? 'bottom-0 left-0' : 'bottom-0 right-0'}`}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={brandLogoUrl} alt="preview" style={{ width: `${Math.round(Number(brandSize) / 8)}px`, objectFit: 'contain' }} />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Work Hours ───────────────────────────────────────────────────────── */}
+      <div className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-2xl p-6 space-y-4">
+        <div className="flex items-center gap-2">
+          <Clock className="w-5 h-5 text-green-400" />
+          <h2 className="font-semibold text-white text-lg">Work Day Hours</h2>
+        </div>
+        <p className="text-sm text-[hsl(var(--muted-foreground))]">Used by the Daily View to show the work day progress bar and remaining time.</p>
+        <div className="flex items-center gap-6">
+          <div className="space-y-1.5">
+            <label className="text-sm text-[hsl(var(--muted-foreground))]">Work Start</label>
+            <input type="time" value={workStart} onChange={e => setWorkStart(e.target.value)}
+              className="bg-[hsl(var(--input))] border border-[hsl(var(--border))] focus:border-blue-500 text-white px-3 py-2 rounded-lg text-sm outline-none" />
+          </div>
+          <div className="text-gray-600 mt-5 text-xl">→</div>
+          <div className="space-y-1.5">
+            <label className="text-sm text-[hsl(var(--muted-foreground))]">Work End</label>
+            <input type="time" value={workEnd} onChange={e => setWorkEnd(e.target.value)}
+              className="bg-[hsl(var(--input))] border border-[hsl(var(--border))] focus:border-blue-500 text-white px-3 py-2 rounded-lg text-sm outline-none" />
+          </div>
+          <div className="mt-5 text-sm text-[hsl(var(--muted-foreground))]">
+            {(() => {
+              const [sh, sm] = workStart.split(':').map(Number);
+              const [eh, em] = workEnd.split(':').map(Number);
+              const mins = (eh * 60 + em) - (sh * 60 + sm);
+              if (mins <= 0) return '';
+              return `${Math.floor(mins / 60)}h ${mins % 60}m work day`;
+            })()}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Pi Setup heading ─────────────────────────────────────────────────── */}
       <div>
-        <h1 className="text-2xl font-bold text-white">Settings & Pi Setup</h1>
+        <h1 className="text-2xl font-bold text-white">Pi Setup</h1>
         <p className="text-sm text-[hsl(var(--muted-foreground))]">Instructions for setting up Raspberry Pi Zero 2W as a display client</p>
       </div>
 

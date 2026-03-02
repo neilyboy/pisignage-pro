@@ -5,6 +5,13 @@ import type { Playlist, Asset } from '@/lib/types';
 import PlannerWidget from '@/components/PlannerWidget';
 import DayWidget from '@/components/DayWidget';
 
+interface BrandSettings {
+  brand_enabled: string;
+  brand_logo_url: string;
+  brand_position: string;
+  brand_size: string;
+}
+
 interface PlaylistItem {
   id: string;
   asset_id: string;
@@ -18,6 +25,7 @@ export default function DisplayPage() {
   const [items, setItems] = useState<PlaylistItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [announcement, setAnnouncement] = useState<{ text: string; color: string; bg_color: string; speed: number } | null>(null);
+  const [brand, setBrand] = useState<BrandSettings | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const currentIndexRef = useRef(0);
@@ -37,6 +45,16 @@ export default function DisplayPage() {
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(advance, durationMs);
   }, [advance]);
+
+  useEffect(() => {
+    fetch('/api/settings').then(r => r.json()).then((s: Record<string, string>) => {
+      setBrand(s as unknown as BrandSettings);
+    }).catch(() => {});
+    const t = setInterval(() => {
+      fetch('/api/settings').then(r => r.json()).then((s: Record<string, string>) => setBrand(s as unknown as BrandSettings)).catch(() => {});
+    }, 60000);
+    return () => clearInterval(t);
+  }, []);
 
   const loadPlaylist = useCallback(async (playlistId: string) => {
     const res = await fetch(`/api/playlists/${playlistId}`);
@@ -109,16 +127,20 @@ export default function DisplayPage() {
   const renderAsset = () => {
     if (!asset) return null;
     switch (asset.type) {
-      case 'image':
+      case 'image':{
+        const fit = (asset.metadata as { fit?: string })?.fit === 'contain' ? 'contain' : 'cover';
         return (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={asset.file_path ? asset.file_path : asset.url ?? ''}
-            alt={asset.name}
-            className="w-full h-full"
-            style={{ objectFit: (asset.metadata as { fit?: string })?.fit === 'contain' ? 'contain' : 'cover' }}
-          />
+          <div className="w-full h-full" style={{ background: fit === 'contain' ? 'transparent' : 'black' }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={asset.file_path ? asset.file_path : asset.url ?? ''}
+              alt={asset.name}
+              className="w-full h-full"
+              style={{ objectFit: fit }}
+            />
+          </div>
         );
+      }
       case 'video':
       case 'youtube':
         return (
@@ -180,9 +202,30 @@ export default function DisplayPage() {
     );
   }
 
+  const brandLogoPositionClass = (() => {
+    switch (brand?.brand_position) {
+      case 'top-left':     return 'top-4 left-4';
+      case 'top-right':    return 'top-4 right-4';
+      case 'bottom-left':  return 'bottom-4 left-4';
+      default:             return 'bottom-4 right-4';
+    }
+  })();
+
   return (
     <div className="w-screen h-screen bg-black overflow-hidden relative">
       {renderAsset()}
+
+      {/* Brand logo overlay */}
+      {brand?.brand_enabled === 'true' && brand.brand_logo_url && (
+        <div className={`absolute ${brandLogoPositionClass} pointer-events-none z-10`}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={brand.brand_logo_url}
+            alt="logo"
+            style={{ width: `${brand.brand_size ?? 120}px`, objectFit: 'contain' }}
+          />
+        </div>
+      )}
 
       {/* Announcement ticker */}
       {announcement && (

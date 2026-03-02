@@ -59,28 +59,38 @@ function LiveClock() {
   );
 }
 
+function formatHour(h: number): string {
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+  return `${h12} ${ampm}`;
+}
+
 // ─── Progress bar for the day timeline ───────────────────────────────────────
-function DayProgress({ nowH }: { nowH: number }) {
-  const startH = 6;  // show from 6am
-  const endH = 22;   // to 10pm
+function DayProgress({ nowH, startH, endH }: { nowH: number; startH: number; endH: number }) {
   const pct = Math.max(0, Math.min(100, ((nowH - startH) / (endH - startH)) * 100));
   const label = (() => {
     const remaining = endH - nowH;
-    if (remaining <= 0) return 'End of day';
+    if (remaining <= 0) return 'Work day complete';
+    if (nowH < startH) {
+      const until = startH - nowH;
+      const h = Math.floor(until);
+      const m = Math.round((until - h) * 60);
+      return h > 0 ? `Work starts in ${h}h ${m}m` : `Work starts in ${m}m`;
+    }
     const hrs = Math.floor(remaining);
     const mins = Math.round((remaining - hrs) * 60);
-    return hrs > 0 ? `${hrs}h ${mins}m remaining in workday` : `${mins}m remaining`;
+    return hrs > 0 ? `${hrs}h ${mins}m remaining` : `${mins}m remaining`;
   })();
 
   return (
     <div className="space-y-1.5">
       <div className="flex justify-between text-xs font-bold uppercase tracking-widest text-gray-500">
-        <span>6 AM</span>
+        <span>{formatHour(startH)}</span>
         <span className="text-blue-400">{label}</span>
-        <span>10 PM</span>
+        <span>{formatHour(endH)}</span>
       </div>
       <div className="w-full bg-white/5 rounded-full h-2 relative">
-        <div className="h-2 rounded-full bg-gradient-to-r from-blue-600 to-blue-400 transition-all duration-60000"
+        <div className="h-2 rounded-full bg-gradient-to-r from-blue-600 to-blue-400 transition-all"
           style={{ width: `${pct}%` }} />
         <div className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white border-2 border-blue-400 shadow-lg shadow-blue-400/50"
           style={{ left: `calc(${pct}% - 6px)` }} />
@@ -210,13 +220,24 @@ export default function DayWidget() {
   const [events, setEvents] = useState<PlannerEvent[]>([]);
   const [kpis, setKpis] = useState<KpiItem[]>([]);
   const [now, setNow] = useState(new Date());
+  const [workStart, setWorkStart] = useState(8);   // default 8am
+  const [workEnd, setWorkEnd] = useState(17);      // default 5pm
 
   const load = useCallback(() => {
-    // Use ?today=1 so the SERVER determines today's date — avoids Pi browser running in UTC
     fetch(`/api/planner?today=1`).then(r => r.json()).then(d => {
       setEvents(d as PlannerEvent[]);
     }).catch(() => {});
     fetch('/api/kpi').then(r => r.json()).then(setKpis).catch(() => {});
+    fetch('/api/settings').then(r => r.json()).then((s: Record<string, string>) => {
+      if (s.work_start) {
+        const [h, m] = s.work_start.split(':').map(Number);
+        setWorkStart(h + m / 60);
+      }
+      if (s.work_end) {
+        const [h, m] = s.work_end.split(':').map(Number);
+        setWorkEnd(h + m / 60);
+      }
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -266,7 +287,7 @@ export default function DayWidget() {
 
       {/* ── Day progress bar ─────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 px-8 py-3 border-b" style={{ borderColor: '#1e2d4a' }}>
-        <DayProgress nowH={nowH} />
+        <DayProgress nowH={nowH} startH={workStart} endH={workEnd} />
       </div>
 
       {/* ── Event list ──────────────────────────────────────────────────────── */}
