@@ -3,10 +3,9 @@ import { useEffect, useState, useCallback } from 'react';
 import type { PlannerEvent, KpiItem } from '@/lib/types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function getMondayOfWeek(date: Date): Date {
+function getSundayOfWeek(date: Date): Date {
   const d = new Date(date);
-  const day = d.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
+  const diff = -d.getDay(); // Sunday is 0, so this snaps back to Sunday
   d.setDate(d.getDate() + diff);
   d.setHours(0, 0, 0, 0);
   return d;
@@ -151,7 +150,7 @@ export default function PlannerWidget() {
   const [view, setView] = useState<'week' | 'kpi'>('week');
   const [tick, setTick] = useState(0);
 
-  const weekStart = getMondayOfWeek(new Date());
+  const weekStart = getSundayOfWeek(new Date());
   const weekDates = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(weekStart);
     d.setDate(d.getDate() + i);

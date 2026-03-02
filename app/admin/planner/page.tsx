@@ -32,11 +32,9 @@ const PRIORITIES = [
 const KPI_COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16'];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function getMondayOfWeek(date: Date): Date {
+function getSundayOfWeek(date: Date): Date {
   const d = new Date(date);
-  const day = d.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
+  d.setDate(d.getDate() - d.getDay());
   d.setHours(0, 0, 0, 0);
   return d;
 }
@@ -201,7 +199,7 @@ function EventBlock({ event, onClick }: { event: PlannerEvent; onClick: (e: Reac
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function PlannerPage() {
-  const [weekStart, setWeekStart] = useState<Date>(() => getMondayOfWeek(new Date()));
+  const [weekStart, setWeekStart] = useState<Date>(() => getSundayOfWeek(new Date()));
   const [events, setEvents] = useState<PlannerEvent[]>([]);
   const [kpis, setKpis] = useState<KpiItem[]>([]);
   const [tab, setTab] = useState<'planner' | 'kpi'>('planner');
@@ -246,9 +244,9 @@ export default function PlannerPage() {
   }, [loadEvents, loadKpis]);
 
   // ── Navigation ──────────────────────────────────────────────────────────────
-  const prevWeek = () => { const d = new Date(weekStart); d.setDate(d.getDate() - 7); setWeekStart(d); };
-  const nextWeek = () => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); setWeekStart(d); };
-  const goToday = () => setWeekStart(getMondayOfWeek(new Date()));
+  const prevWeek = () => { const d = new Date(weekStart); d.setDate(d.getDate() - 7); setWeekStart(getSundayOfWeek(d)); };
+  const nextWeek = () => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); setWeekStart(getSundayOfWeek(d)); };
+  const goToday = () => setWeekStart(getSundayOfWeek(new Date()));
 
   const weekLabel = (() => {
     const end = weekDates[6];
