@@ -3,6 +3,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import type { Playlist, Asset } from '@/lib/types';
 import PlannerWidget from '@/components/PlannerWidget';
+import DayWidget from '@/components/DayWidget';
 
 interface PlaylistItem {
   id: string;
@@ -162,6 +163,8 @@ export default function DisplayPage() {
         return <ClockWidget />;
       case 'planner':
         return <PlannerWidget />;
+      case 'planner-day':
+        return <DayWidget />;
       default:
         return <div className="w-full h-full bg-black flex items-center justify-center text-white">{asset.name}</div>;
     }
