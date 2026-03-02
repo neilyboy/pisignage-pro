@@ -12,3 +12,4 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - NEXT_TELEMETRY_DISABLED=1
+      - TZ=America/Chicago
