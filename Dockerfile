@@ -9,6 +9,8 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Ensure public/ exists (uploads/ is gitignored so may not be in build context)
+RUN mkdir -p /app/public/uploads
 RUN NEXT_TELEMETRY_DISABLED=1 npm run build
 
 # Stage 3: runner
@@ -26,8 +28,10 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Copy built app
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+# public/ must exist in the standalone workdir for Next.js to serve static files
+COPY --from=builder /app/public ./public
 
-# Runtime dirs (uploads is bind-mounted from host, data holds SQLite DB)
+# Runtime dirs (bind-mounted from host at docker run time)
 RUN mkdir -p /app/data /app/public/uploads
 
 EXPOSE 3000

@@ -15,11 +15,11 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 type FormState = {
-  name: string; type: string; url: string; duration: number;
+  name: string; type: string; url: string; file_path: string; duration: number;
   metadata: Record<string, unknown>; tags: string;
 };
 
-const DEFAULT_FORM: FormState = { name: '', type: 'image', url: '', duration: 10, metadata: {}, tags: '' };
+const DEFAULT_FORM: FormState = { name: '', type: 'image', url: '', file_path: '', duration: 10, metadata: {}, tags: '' };
 
 export default function MediaPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -30,9 +30,11 @@ export default function MediaPage() {
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
   const [editId, setEditId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [modalUploading, setModalUploading] = useState(false);
   const [ytUrl, setYtUrl] = useState('');
   const [ytLoading, setYtLoading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const modalFileRef = useRef<HTMLInputElement>(null);
 
   const load = () => {
     setLoading(true);
@@ -53,7 +55,7 @@ export default function MediaPage() {
   };
   const openEdit = (a: Asset) => {
     setEditId(a.id);
-    setForm({ name: a.name, type: a.type, url: a.url ?? '', duration: a.duration, metadata: a.metadata, tags: a.tags.join(', ') });
+    setForm({ name: a.name, type: a.type, url: a.url ?? '', file_path: a.file_path ?? '', duration: a.duration, metadata: a.metadata, tags: a.tags.join(', ') });
     setShowModal(true);
   };
 
@@ -66,6 +68,22 @@ export default function MediaPage() {
     }
     setShowModal(false);
     load();
+  };
+
+  const uploadModalFile = async (file: File) => {
+    setModalUploading(true);
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch('/api/upload', { method: 'POST', body: fd });
+    const { url } = await res.json();
+    const autoName = file.name.replace(/\.[^.]+$/, '');
+    setForm(f => ({
+      ...f,
+      file_path: url,
+      name: f.name || autoName,
+      type: file.type.startsWith('video/') ? 'video' : 'image',
+    }));
+    setModalUploading(false);
   };
 
   const deleteAsset = async (id: string) => {
@@ -231,6 +249,21 @@ export default function MediaPage() {
                 <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                   className="w-full bg-[hsl(var(--input))] border border-[hsl(var(--border))] focus:border-blue-500 text-white px-3 py-2 rounded-lg text-sm outline-none" />
               </label>
+              {['image', 'video'].includes(form.type) && (
+                <label className="space-y-1.5 block">
+                  <span className="text-sm text-[hsl(var(--muted-foreground))]">File</span>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => modalFileRef.current?.click()}
+                      disabled={modalUploading}
+                      className="flex items-center gap-2 border border-[hsl(var(--border))] hover:border-blue-500 text-[hsl(var(--muted-foreground))] hover:text-white px-3 py-2 rounded-lg text-sm transition-colors disabled:opacity-40">
+                      <Upload className="w-4 h-4" />{modalUploading ? 'Uploading…' : 'Choose File'}
+                    </button>
+                    {form.file_path && <span className="text-xs text-green-400 truncate max-w-[200px]">{form.file_path.split('/').pop()}</span>}
+                  </div>
+                  <input ref={modalFileRef} type="file" accept={form.type === 'video' ? 'video/*' : 'image/*'} className="hidden"
+                    onChange={e => e.target.files?.[0] && uploadModalFile(e.target.files[0])} />
+                </label>
+              )}
               {['webpage', 'text', 'html'].includes(form.type) && (
                 <label className="space-y-1.5 block">
                   <span className="text-sm text-[hsl(var(--muted-foreground))]">{form.type === 'webpage' ? 'URL' : form.type === 'html' ? 'HTML Content' : 'Text Content'}</span>
