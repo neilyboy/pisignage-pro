@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Copy, Check, Terminal, Download, Upload, Image as ImageIcon, Clock, Save, Monitor, RefreshCw, Wifi, WifiOff, Activity, Settings2, ChevronDown, ChevronRight, Palette, CloudSun } from 'lucide-react';
 import type { Device } from '@/lib/types';
 import { THEMES, type DayTheme } from '@/lib/themes';
+import { buildLogoFilter } from '@/lib/logoEffect';
 
 export default function SettingsPage() {
   const [copied, setCopied] = useState<string | null>(null);
@@ -12,6 +13,9 @@ export default function SettingsPage() {
   const [brandLogoUrl, setBrandLogoUrl] = useState('');
   const [brandPosition, setBrandPosition] = useState('bottom-right');
   const [brandSize, setBrandSize] = useState('120');
+  const [brandEffect, setBrandEffect] = useState('none');
+  const [brandEffectColor, setBrandEffectColor] = useState('#3b82f6');
+  const [brandEffectIntensity, setBrandEffectIntensity] = useState('12');
   const [workStart, setWorkStart] = useState('08:00');
   const [workEnd, setWorkEnd] = useState('17:00');
   const [activeThemeId, setActiveThemeId] = useState('midnight');
@@ -79,6 +83,9 @@ export default function SettingsPage() {
           brand_logo_url: brandLogoUrl,
           brand_position: brandPosition,
           brand_size: brandSize,
+          brand_effect: brandEffect,
+          brand_effect_color: brandEffectColor,
+          brand_effect_intensity: brandEffectIntensity,
           work_start: workStart,
           work_end: workEnd,
           display_theme: activeThemeId,
@@ -101,6 +108,9 @@ export default function SettingsPage() {
       setBrandLogoUrl(s.brand_logo_url ?? '');
       setBrandPosition(s.brand_position ?? 'bottom-right');
       setBrandSize(s.brand_size ?? '120');
+      setBrandEffect(s.brand_effect ?? 'none');
+      setBrandEffectColor(s.brand_effect_color ?? '#3b82f6');
+      setBrandEffectIntensity(s.brand_effect_intensity ?? '12');
       setWorkStart(s.work_start ?? '08:00');
       setWorkEnd(s.work_end ?? '17:00');
       setActiveThemeId(s.display_theme ?? 'midnight');
@@ -124,6 +134,9 @@ export default function SettingsPage() {
         brand_logo_url: brandLogoUrl,
         brand_position: brandPosition,
         brand_size: brandSize,
+        brand_effect: brandEffect,
+        brand_effect_color: brandEffectColor,
+        brand_effect_intensity: brandEffectIntensity,
         work_start: workStart,
         work_end: workEnd,
         display_theme: activeThemeId,
@@ -340,7 +353,60 @@ sudo reboot`;
                 <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-700">Screen Preview</div>
                 <div className={`absolute p-2 ${brandPosition === 'top-left' ? 'top-0 left-0' : brandPosition === 'top-right' ? 'top-0 right-0' : brandPosition === 'bottom-left' ? 'bottom-0 left-0' : 'bottom-0 right-0'}`}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={brandLogoUrl} alt="preview" style={{ width: `${Math.round(Number(brandSize) / 8)}px`, objectFit: 'contain' }} />
+                  <img src={brandLogoUrl} alt="preview"
+                    style={{
+                      width: `${Math.round(Number(brandSize) / 8)}px`,
+                      objectFit: 'contain',
+                      filter: buildLogoFilter(brandEffect, brandEffectColor, Number(brandEffectIntensity)),
+                    }} />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Logo Effect */}
+          <div className="col-span-2 space-y-4 pt-2 border-t border-[hsl(var(--border))]">
+            <div className="text-sm font-semibold text-white">Logo Effect</div>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              {[
+                { value: 'none',       label: 'None',        icon: '○' },
+                { value: 'glow',       label: 'Glow',        icon: '✦' },
+                { value: 'shadow',     label: 'Drop Shadow', icon: '◼' },
+                { value: 'outline',    label: 'Outline',     icon: '⬡' },
+              ].map(opt => (
+                <button key={opt.value} onClick={() => setBrandEffect(opt.value)}
+                  className={`flex items-center gap-2 py-2 px-3 rounded-xl text-sm font-medium border transition-all ${
+                    brandEffect === opt.value
+                      ? 'border-blue-500 bg-blue-600/20 text-white'
+                      : 'border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:text-white hover:border-white/30'
+                  }`}>
+                  <span className="text-base leading-none">{opt.icon}</span>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            {brandEffect !== 'none' && (
+              <div className="grid grid-cols-2 gap-4 items-end">
+                <div className="space-y-1.5">
+                  <label className="text-sm text-[hsl(var(--muted-foreground))]">Effect Color</label>
+                  <div className="flex items-center gap-2">
+                    <input type="color" value={brandEffectColor}
+                      onChange={e => setBrandEffectColor(e.target.value)}
+                      className="w-9 h-9 rounded-lg cursor-pointer border border-[hsl(var(--border))] bg-transparent p-0.5" />
+                    <input type="text" value={brandEffectColor}
+                      onChange={e => setBrandEffectColor(e.target.value)}
+                      className="flex-1 bg-[hsl(var(--input))] border border-[hsl(var(--border))] text-white text-sm px-3 py-2 rounded-lg outline-none focus:border-blue-500 font-mono" />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm text-[hsl(var(--muted-foreground))]">
+                    Intensity: <span className="text-white font-bold">{brandEffectIntensity}</span>
+                  </label>
+                  <input type="range" min="1" max="40" step="1" value={brandEffectIntensity}
+                    onChange={e => setBrandEffectIntensity(e.target.value)}
+                    className="w-full accent-blue-500" />
+                  <div className="text-xs text-[hsl(var(--muted-foreground))]">1 (subtle) → 40 (intense)</div>
                 </div>
               </div>
             )}

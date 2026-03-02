@@ -7,12 +7,16 @@ import DayWidget from '@/components/DayWidget';
 import WeatherWidget from '@/components/WeatherWidget';
 import WeekGlanceWidget from '@/components/WeekGlanceWidget';
 import JobPipelineWidget from '@/components/JobPipelineWidget';
+import { buildLogoFilter } from '@/lib/logoEffect';
 
 interface BrandSettings {
   brand_enabled: string;
   brand_logo_url: string;
   brand_position: string;
   brand_size: string;
+  brand_effect: string;
+  brand_effect_color: string;
+  brand_effect_intensity: string;
 }
 
 interface PlaylistItem {
@@ -234,7 +238,15 @@ export default function DisplayPage() {
           <img
             src={brand.brand_logo_url}
             alt="logo"
-            style={{ width: `${brand.brand_size ?? 120}px`, objectFit: 'contain' }}
+            style={{
+              width: `${brand.brand_size ?? 120}px`,
+              objectFit: 'contain',
+              filter: buildLogoFilter(
+                brand.brand_effect ?? 'none',
+                brand.brand_effect_color ?? '#3b82f6',
+                Number(brand.brand_effect_intensity ?? 12),
+              ),
+            }}
           />
         </div>
       )}
