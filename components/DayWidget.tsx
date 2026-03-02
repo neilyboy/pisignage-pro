@@ -99,85 +99,138 @@ function DayProgress({ nowH, startH, endH }: { nowH: number; startH: number; end
   );
 }
 
-// ─── Single event row ─────────────────────────────────────────────────────────
-function EventRow({ event, nowH, isNext }: { event: PlannerEvent; nowH: number; isNext: boolean }) {
-  const startH = parseTime(event.start_time);
-  const endH = parseTime(event.end_time);
-  const isPast = endH < nowH;
-  const isActive = startH <= nowH && endH > nowH;
-  const cat = CATEGORY_CONFIG[event.category] ?? CATEGORY_CONFIG.general;
-  const pri = PRIORITY_CONFIG[event.priority] ?? PRIORITY_CONFIG.normal;
-  const durMins = Math.round((endH - startH) * 60);
-  const durLabel = durMins >= 60 ? `${Math.floor(durMins / 60)}h${durMins % 60 > 0 ? ` ${durMins % 60}m` : ''}` : `${durMins}m`;
+// ─── Proportional timeline ────────────────────────────────────────────────────
+function TimelineView({ events, nowH, workStart, workEnd }: {
+  events: PlannerEvent[]; nowH: number; workStart: number; workEnd: number;
+}) {
+  const daySpan = workEnd - workStart;
+  if (daySpan <= 0) return null;
+
+  // Position of "now" line as percentage
+  const nowPct = Math.max(0, Math.min(100, ((nowH - workStart) / daySpan) * 100));
+  const isWorkDay = nowH >= workStart && nowH <= workEnd;
+
+  // Hour tick marks
+  const ticks: number[] = [];
+  for (let h = Math.ceil(workStart); h < workEnd; h++) ticks.push(h);
 
   return (
-    <div className={`relative flex items-stretch gap-4 rounded-2xl overflow-hidden transition-all ${
-      isActive ? 'ring-2 shadow-2xl' : ''
-    } ${isPast ? 'opacity-40' : ''}`}
-      style={{
-        backgroundColor: isActive ? event.color + '18' : 'rgba(255,255,255,0.03)',
-        borderLeft: `4px solid ${isActive || isNext ? event.color : event.color + '60'}`,
-        boxShadow: isActive ? `0 0 40px ${event.color}20` : undefined,
-        ...(isActive ? { '--tw-ring-color': event.color + '60' } as React.CSSProperties : {}),
-      }}>
-
-      {/* Active pulse indicator */}
-      {isActive && (
-        <div className="absolute top-3 right-4 flex items-center gap-1.5">
-          <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: event.color }} />
-          <span className="text-xs font-black uppercase tracking-widest" style={{ color: event.color }}>Live</span>
+    <div className="relative w-full h-full flex">
+      {/* Time axis */}
+      <div className="flex-shrink-0 w-16 relative">
+        {ticks.map(h => {
+          const pct = ((h - workStart) / daySpan) * 100;
+          const label = h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`;
+          return (
+            <div key={h} className="absolute right-2 -translate-y-1/2 text-[10px] font-bold text-gray-600 tabular-nums"
+              style={{ top: `${pct}%` }}>
+              {label}
+            </div>
+          );
+        })}
+        {/* Work start / end labels */}
+        <div className="absolute right-2 text-[10px] font-bold text-blue-500" style={{ top: '0%' }}>
+          {workStart % 1 === 0 ? `${workStart === 0 ? 12 : workStart > 12 ? workStart - 12 : workStart}${workStart < 12 ? 'a' : 'p'}` : formatTime12(`${Math.floor(workStart)}:${String(Math.round((workStart % 1) * 60)).padStart(2, '0')}`)}
         </div>
-      )}
-      {isNext && !isActive && (
-        <div className="absolute top-3 right-4">
-          <span className="text-xs font-bold uppercase tracking-widest text-yellow-400">Up Next</span>
+        <div className="absolute right-2 -translate-y-full text-[10px] font-bold text-blue-500" style={{ top: '100%' }}>
+          {workEnd % 1 === 0 ? `${workEnd === 0 ? 12 : workEnd > 12 ? workEnd - 12 : workEnd}${workEnd < 12 ? 'a' : 'p'}` : formatTime12(`${Math.floor(workEnd)}:${String(Math.round((workEnd % 1) * 60)).padStart(2, '0')}`)}
         </div>
-      )}
-
-      {/* Time column */}
-      <div className="flex-shrink-0 w-28 flex flex-col items-center justify-center py-4 gap-0.5"
-        style={{ backgroundColor: event.color + (isActive ? '20' : '10') }}>
-        <span className="text-sm font-black text-white">{formatTime12(event.start_time)}</span>
-        <span className="text-xs text-gray-500">↓</span>
-        <span className="text-sm font-bold text-gray-400">{formatTime12(event.end_time)}</span>
-        <span className="text-[10px] font-bold uppercase tracking-widest mt-1 px-2 py-0.5 rounded-full"
-          style={{ backgroundColor: event.color + '25', color: event.color }}>{durLabel}</span>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 py-4 pr-4 min-w-0">
-        <div className="flex items-start gap-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-black uppercase tracking-widest px-2 py-0.5 rounded-full"
-                style={{ backgroundColor: cat.color + '20', color: cat.color }}>{cat.label}</span>
-              <span className="text-xs font-bold" style={{ color: pri.color }}>{pri.icon} {pri.label}</span>
-              {event.completed && (
-                <span className="text-xs font-bold text-green-400 bg-green-400/10 px-2 py-0.5 rounded-full">✓ Done</span>
-              )}
-            </div>
-            <div className={`font-black text-white leading-tight ${isActive ? 'text-2xl' : 'text-xl'}`}
-              style={{ textDecoration: event.completed ? 'line-through' : 'none', opacity: event.completed ? 0.6 : 1 }}>
-              {event.title}
-            </div>
-            {event.notes && (
-              <div className="text-sm text-gray-400 mt-1.5 leading-snug">{event.notes}</div>
-            )}
-          </div>
-        </div>
+      {/* Timeline column */}
+      <div className="flex-1 relative" style={{ minHeight: 0 }}>
+        {/* Hour grid lines */}
+        {ticks.map(h => {
+          const pct = ((h - workStart) / daySpan) * 100;
+          return (
+            <div key={h} className="absolute left-0 right-0 border-t border-white/5" style={{ top: `${pct}%` }} />
+          );
+        })}
 
-        {/* Active: show time elapsed bar */}
-        {isActive && (
-          <div className="mt-3">
-            <div className="w-full bg-white/10 rounded-full h-1.5">
-              <div className="h-1.5 rounded-full transition-all"
-                style={{ width: `${Math.min(100, ((nowH - startH) / (endH - startH)) * 100)}%`, backgroundColor: event.color }} />
-            </div>
-            <div className="text-xs text-gray-500 mt-1">
-              {Math.round((nowH - startH) * 60)}m elapsed · {Math.round((endH - nowH) * 60)}m remaining
+        {/* Now line */}
+        {isWorkDay && (
+          <div className="absolute left-0 right-0 z-20" style={{ top: `${nowPct}%` }}>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-blue-400 flex-shrink-0" style={{ marginLeft: '-4px' }} />
+              <div className="flex-1 border-t-2 border-blue-400/80 border-dashed" />
             </div>
           </div>
         )}
+
+        {/* Event blocks */}
+        {events.map(ev => {
+          const evStart = parseTime(ev.start_time);
+          const evEnd = parseTime(ev.end_time);
+          const clampedStart = Math.max(evStart, workStart);
+          const clampedEnd = Math.min(evEnd, workEnd);
+          if (clampedEnd <= clampedStart) return null;
+
+          const topPct = ((clampedStart - workStart) / daySpan) * 100;
+          const heightPct = ((clampedEnd - clampedStart) / daySpan) * 100;
+          const isPast = evEnd < nowH;
+          const isActive = evStart <= nowH && evEnd > nowH;
+          const cat = CATEGORY_CONFIG[ev.category] ?? CATEGORY_CONFIG.general;
+          const pri = PRIORITY_CONFIG[ev.priority] ?? PRIORITY_CONFIG.normal;
+          const durMins = Math.round((evEnd - evStart) * 60);
+          const durLabel = durMins >= 60 ? `${Math.floor(durMins / 60)}h${durMins % 60 > 0 ? ` ${durMins % 60}m` : ''}` : `${durMins}m`;
+          const isShort = heightPct < 8; // less than ~38min on 8h day
+
+          return (
+            <div key={ev.id}
+              className={`absolute left-1 right-1 rounded-xl overflow-hidden transition-all z-10 ${isActive ? 'ring-1' : ''}`}
+              style={{
+                top: `${topPct}%`,
+                height: `${heightPct}%`,
+                minHeight: '28px',
+                backgroundColor: ev.color + (isActive ? '28' : '18'),
+                borderLeft: `3px solid ${ev.color}${isPast ? '60' : ''}`,
+                boxShadow: isActive ? `0 0 20px ${ev.color}30` : undefined,
+                opacity: isPast ? 0.45 : 1,
+                ...(isActive ? { '--tw-ring-color': ev.color + '70' } as React.CSSProperties : {}),
+              }}>
+              <div className={`flex items-start gap-2 px-2 ${isShort ? 'py-0.5' : 'py-2'} h-full`}>
+                {/* Color dot */}
+                <div className="flex-shrink-0 mt-0.5 w-2 h-2 rounded-full" style={{ backgroundColor: ev.color }} />
+                <div className="flex-1 min-w-0 overflow-hidden">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className={`font-black text-white truncate ${isShort ? 'text-xs' : isActive ? 'text-base' : 'text-sm'}`}>
+                      {ev.title}
+                    </span>
+                    {isActive && !isShort && (
+                      <span className="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full animate-pulse"
+                        style={{ backgroundColor: ev.color + '30', color: ev.color }}>Live</span>
+                    )}
+                  </div>
+                  {!isShort && (
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      <span className="text-[10px] font-bold text-gray-400">
+                        {formatTime12(ev.start_time)} – {formatTime12(ev.end_time)}
+                      </span>
+                      <span className="text-[10px] font-bold px-1 py-0.5 rounded"
+                        style={{ backgroundColor: cat.color + '20', color: cat.color }}>{cat.label}</span>
+                      <span className="text-[10px] font-bold" style={{ color: pri.color }}>{pri.icon} {durLabel}</span>
+                    </div>
+                  )}
+                  {/* Active progress bar inside block */}
+                  {isActive && !isShort && (
+                    <div className="mt-1.5 w-full bg-white/10 rounded-full h-1">
+                      <div className="h-1 rounded-full transition-all"
+                        style={{ width: `${Math.min(100, ((nowH - evStart) / (evEnd - evStart)) * 100)}%`, backgroundColor: ev.color }} />
+                    </div>
+                  )}
+                  {ev.notes && !isShort && heightPct > 15 && (
+                    <div className="text-[10px] text-gray-500 mt-1 truncate">{ev.notes}</div>
+                  )}
+                </div>
+                {/* Duration badge — far right for non-short */}
+                {!isShort && (
+                  <div className="flex-shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full self-start"
+                    style={{ backgroundColor: ev.color + '25', color: ev.color }}>{durLabel}</div>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -249,8 +302,6 @@ export default function DayWidget() {
 
   const nowH = now.getHours() + now.getMinutes() / 60;
   const sorted = [...events].sort((a, b) => a.start_time.localeCompare(b.start_time));
-  const upcoming = sorted.filter(e => parseTime(e.end_time) > nowH);
-  const nextEventId = upcoming[0]?.id;
   const activeCount = sorted.filter(e => parseTime(e.start_time) <= nowH && parseTime(e.end_time) > nowH).length;
   const doneCount = sorted.filter(e => e.completed || parseTime(e.end_time) <= nowH).length;
 
@@ -290,8 +341,8 @@ export default function DayWidget() {
         <DayProgress nowH={nowH} startH={workStart} endH={workEnd} />
       </div>
 
-      {/* ── Event list ──────────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-hidden px-8 py-4">
+      {/* ── Timeline ────────────────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-hidden px-4 py-3">
         {sorted.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center gap-4">
             <div className="text-8xl">📋</div>
@@ -299,21 +350,13 @@ export default function DayWidget() {
             <div className="text-gray-700 text-sm">Add events in the Weekly Planner</div>
           </div>
         ) : (
-          <div className="h-full flex flex-col gap-3 overflow-hidden"
-            style={{ maxHeight: '100%' }}>
-            {sorted.map((ev) => (
-              <EventRow
-                key={ev.id}
-                event={ev}
-                nowH={nowH}
-                isNext={ev.id === nextEventId && !sorted.some(e => parseTime(e.start_time) <= nowH && parseTime(e.end_time) > nowH)}
-              />
-            )).slice(0, 5)}
-            {sorted.length > 5 && (
-              <div className="text-center text-sm font-bold text-gray-600 uppercase tracking-widest py-2">
-                +{sorted.length - 5} more events today
-              </div>
-            )}
+          <div className="h-full">
+            <TimelineView
+              events={sorted}
+              nowH={nowH}
+              workStart={workStart}
+              workEnd={workEnd}
+            />
           </div>
         )}
       </div>
