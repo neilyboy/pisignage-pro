@@ -108,6 +108,38 @@ function getDb(): Database.Database {
   CREATE INDEX IF NOT EXISTS idx_analytics_created ON analytics(created_at);
   CREATE INDEX IF NOT EXISTS idx_playlist_items_playlist ON playlist_items(playlist_id, position);
   CREATE INDEX IF NOT EXISTS idx_schedules_device ON schedules(device_id);
+
+  CREATE TABLE IF NOT EXISTS planner_events (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    notes TEXT,
+    date TEXT NOT NULL,
+    start_time TEXT NOT NULL,
+    end_time TEXT NOT NULL,
+    color TEXT DEFAULT '#3b82f6',
+    category TEXT DEFAULT 'general',
+    priority TEXT DEFAULT 'normal',
+    completed INTEGER DEFAULT 0,
+    created_at INTEGER DEFAULT (unixepoch()),
+    updated_at INTEGER DEFAULT (unixepoch())
+  );
+
+  CREATE TABLE IF NOT EXISTS kpi_items (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    type TEXT NOT NULL,
+    value REAL DEFAULT 0,
+    target REAL DEFAULT 100,
+    unit TEXT DEFAULT '',
+    color TEXT DEFAULT '#3b82f6',
+    data TEXT DEFAULT '[]',
+    notes TEXT,
+    position INTEGER DEFAULT 0,
+    created_at INTEGER DEFAULT (unixepoch()),
+    updated_at INTEGER DEFAULT (unixepoch())
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_planner_date ON planner_events(date);
 `);
   return _db;
 }

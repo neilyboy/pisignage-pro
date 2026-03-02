@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Monitor, Image, ListVideo, Calendar, Bell, BarChart2,
-  Settings, Tv2, Layers
+  Settings, Tv2, Layers, CalendarDays
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -13,6 +13,7 @@ const nav = [
   { href: '/admin/media', label: 'Media Library', icon: Image },
   { href: '/admin/playlists', label: 'Playlists', icon: ListVideo },
   { href: '/admin/schedule', label: 'Schedule', icon: Calendar },
+  { href: '/admin/planner', label: 'Weekly Planner', icon: CalendarDays },
   { href: '/admin/announcements', label: 'Announcements', icon: Bell },
   { href: '/admin/analytics', label: 'Analytics', icon: BarChart2 },
   { href: '/admin/settings', label: 'Settings', icon: Settings },

@@ -92,6 +92,36 @@ export interface AnalyticsEvent {
   created_at: number;
 }
 
+export interface PlannerEvent {
+  id: string;
+  title: string;
+  notes: string | null;
+  date: string;
+  start_time: string;
+  end_time: string;
+  color: string;
+  category: string;
+  priority: 'low' | 'normal' | 'high' | 'urgent';
+  completed: boolean;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface KpiItem {
+  id: string;
+  title: string;
+  type: 'progress' | 'number' | 'countdown' | 'chart';
+  value: number;
+  target: number;
+  unit: string;
+  color: string;
+  data: Array<{ label: string; value: number }>;
+  notes: string | null;
+  position: number;
+  created_at: number;
+  updated_at: number;
+}
+
 export interface DeviceState {
   deviceId: string;
   playlistId: string | null;
