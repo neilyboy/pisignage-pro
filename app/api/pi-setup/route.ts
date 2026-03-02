@@ -41,6 +41,7 @@ export async function GET(req: NextRequest) {
     '  xserver-xorg \\',
     '  xinit \\',
     '  x11-xserver-utils \\',
+    '  xdotool \\',
     '  curl \\',
     '  python3 2>&1 | tail -5',
     '',
