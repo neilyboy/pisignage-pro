@@ -8,7 +8,7 @@ export async function GET() {
   const s: Record<string, string> = {};
   for (const r of rows) s[r.key] = r.value;
 
-  const apiKey = s.weather_api_key ?? '';
+  const apiKey = (s.weather_api_key ?? '').trim();
   const location = s.weather_location ?? '';
   const units = s.weather_units ?? 'imperial';
 
@@ -18,10 +18,16 @@ export async function GET() {
 
   try {
     const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(location)}&appid=${apiKey}&units=${units}`;
-    const res = await fetch(url, { next: { revalidate: 300 } });
+    const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      return NextResponse.json({ error: (err as { message?: string }).message ?? 'Weather API error' }, { status: res.status });
+      const msg = (err as { message?: string }).message ?? 'Weather API error';
+      const friendlyMsg = (res.status === 401 || res.status === 403)
+        ? 'Invalid API key. New OpenWeatherMap keys can take up to 2 hours to activate after account creation.'
+        : res.status === 404
+        ? `Location "${location}" not found. Try format: City, COUNTRY_CODE (e.g. Peoria, US)`
+        : msg;
+      return NextResponse.json({ error: friendlyMsg }, { status: res.status });
     }
     const data = await res.json();
     return NextResponse.json({

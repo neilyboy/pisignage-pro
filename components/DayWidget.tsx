@@ -269,6 +269,21 @@ function KpiStrip({ kpis }: { kpis: KpiItem[] }) {
   );
 }
 
+// ─── Weather types ────────────────────────────────────────────────────────────
+interface WeatherData {
+  city: string; country: string; temp: number; description: string; icon: string; units: string;
+}
+
+// ─── OWM icon → emoji map ─────────────────────────────────────────────────────
+function weatherEmoji(icon: string): string {
+  const code = icon.replace('n', 'd');
+  const map: Record<string, string> = {
+    '01d': '☀️', '02d': '🌤️', '03d': '🌥️', '04d': '☁️',
+    '09d': '🌧️', '10d': '🌦️', '11d': '⛈️', '13d': '❄️', '50d': '🌫️',
+  };
+  return map[code] ?? '🌡️';
+}
+
 // ─── Main Widget ──────────────────────────────────────────────────────────────
 export default function DayWidget() {
   const [events, setEvents] = useState<PlannerEvent[]>([]);
@@ -277,6 +292,7 @@ export default function DayWidget() {
   const [workStart, setWorkStart] = useState(8);
   const [workEnd, setWorkEnd] = useState(17);
   const [theme, setTheme] = useState<DayTheme>(DEFAULT_THEME);
+  const [weather, setWeather] = useState<WeatherData | null>(null);
 
   const load = useCallback(() => {
     fetch(`/api/planner?today=1`).then(r => r.json()).then(d => {
@@ -293,6 +309,9 @@ export default function DayWidget() {
         setWorkEnd(h + m / 60);
       }
       setTheme(getTheme(s.display_theme ?? 'midnight', s.display_theme_custom));
+    }).catch(() => {});
+    fetch('/api/weather').then(r => r.json()).then(d => {
+      if (!d.error) setWeather(d as WeatherData);
     }).catch(() => {});
   }, []);
 
@@ -336,7 +355,23 @@ export default function DayWidget() {
             </div>
           </div>
         </div>
-        <LiveClock theme={theme} />
+        <div className="flex flex-col items-end gap-3">
+          <LiveClock theme={theme} />
+          {weather && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl"
+              style={{ backgroundColor: theme.accent + '15', border: `1px solid ${theme.accent}30` }}>
+              <span className="text-2xl leading-none">{weatherEmoji(weather.icon)}</span>
+              <div className="text-right">
+                <div className="text-xl font-black tabular-nums leading-none" style={{ color: theme.textPrimary }}>
+                  {weather.temp}°{weather.units === 'imperial' ? 'F' : weather.units === 'metric' ? 'C' : 'K'}
+                </div>
+                <div className="text-[10px] font-bold uppercase tracking-wider capitalize" style={{ color: theme.textMuted }}>
+                  {weather.description} · {weather.city}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Day progress bar ─────────────────────────────────────────────────── */}

@@ -516,7 +516,7 @@ export default function MediaPage() {
               {form.type === 'image' && (
                 <label className="space-y-1.5 block">
                   <span className="text-sm text-[hsl(var(--muted-foreground))]">Image Fit</span>
-                  <select value={(form.metadata.fit as string) ?? 'cover'} onChange={e => setForm(f => ({ ...f, metadata: { ...f.metadata, fit: e.target.value } }))}
+                  <select value={(form.metadata.fit as string) ?? 'contain'} onChange={e => setForm(f => ({ ...f, metadata: { ...f.metadata, fit: e.target.value } }))}
                     className="w-full bg-[hsl(var(--input))] border border-[hsl(var(--border))] text-white px-3 py-2 rounded-lg text-sm outline-none">
                     <option value="cover">Cover (fill screen, crop)</option>
                     <option value="contain">Contain (letterbox)</option>

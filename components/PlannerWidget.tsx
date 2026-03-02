@@ -31,6 +31,20 @@ const CATEGORY_LABELS: Record<string, string> = {
   travel: 'TRV', admin: 'ADM', personal: 'PRS',
 };
 
+// ─── Weather types ────────────────────────────────────────────────────────────
+interface WeatherData {
+  city: string; country: string; temp: number; description: string; icon: string; units: string;
+}
+
+function weatherEmoji(icon: string): string {
+  const code = icon.replace('n', 'd');
+  const map: Record<string, string> = {
+    '01d': '☀️', '02d': '🌤️', '03d': '🌥️', '04d': '☁️',
+    '09d': '🌧️', '10d': '🌦️', '11d': '⛈️', '13d': '❄️', '50d': '🌫️',
+  };
+  return map[code] ?? '🌡️';
+}
+
 // ─── Live Clock ───────────────────────────────────────────────────────────────
 function LiveClock({ theme }: { theme: DayTheme }) {
   const [now, setNow] = useState(new Date());
@@ -157,6 +171,7 @@ export default function PlannerWidget() {
   const [view, setView] = useState<'week' | 'kpi'>('week');
   const [tick, setTick] = useState(0);
   const [theme, setTheme] = useState<DayTheme>(DEFAULT_THEME);
+  const [weather, setWeather] = useState<WeatherData | null>(null);
 
   const weekStart = getSundayOfWeek(new Date());
   const weekDates = Array.from({ length: 7 }, (_, i) => {
@@ -173,6 +188,9 @@ export default function PlannerWidget() {
     fetch('/api/kpi').then(r => r.json()).then(setKpis).catch(() => {});
     fetch('/api/settings').then(r => r.json()).then((s: Record<string, string>) => {
       setTheme(getTheme(s.display_theme ?? 'midnight', s.display_theme_custom));
+    }).catch(() => {});
+    fetch('/api/weather').then(r => r.json()).then(d => {
+      if (!d.error) setWeather(d as WeatherData);
     }).catch(() => {});
   }, [weekParam]);
 
@@ -209,6 +227,20 @@ export default function PlannerWidget() {
             <div className="text-xs font-black uppercase tracking-[0.3em]" style={{ color: theme.accent }}>Weekly Operations</div>
             <div className="text-2xl font-black uppercase tracking-wider" style={{ color: theme.textPrimary }}>{weekLabel}</div>
           </div>
+          {weather && (
+            <div className="flex items-center gap-2.5 px-4 py-2 rounded-2xl"
+              style={{ backgroundColor: theme.accent + '15', border: `1px solid ${theme.accent}30` }}>
+              <span className="text-3xl leading-none">{weatherEmoji(weather.icon)}</span>
+              <div>
+                <div className="text-2xl font-black tabular-nums leading-none" style={{ color: theme.textPrimary }}>
+                  {weather.temp}°{weather.units === 'imperial' ? 'F' : weather.units === 'metric' ? 'C' : 'K'}
+                </div>
+                <div className="text-[10px] font-bold uppercase tracking-wider capitalize" style={{ color: theme.textMuted }}>
+                  {weather.description} · {weather.city}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
         <LiveClock theme={theme} />
       </div>
