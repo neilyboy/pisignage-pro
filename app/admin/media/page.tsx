@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useRef } from 'react';
-import { Image as ImageIcon, Video, Globe, Type, Youtube, Clock, Upload, Plus, Trash2, Edit2, Search, X, Download, RefreshCw, CalendarDays } from 'lucide-react';
+import { Image as ImageIcon, Video, Globe, Type, Youtube, Clock, Upload, Plus, Trash2, Edit2, Search, X, Download, RefreshCw, CalendarDays, Folder, FolderOpen, FolderPlus, FolderInput } from 'lucide-react';
 import type { Asset } from '@/lib/types';
 import { formatDuration } from '@/lib/utils';
 
@@ -17,13 +17,15 @@ const TYPE_COLORS: Record<string, string> = {
 
 type FormState = {
   name: string; type: string; url: string; file_path: string; duration: number;
-  metadata: Record<string, unknown>; tags: string;
+  metadata: Record<string, unknown>; tags: string; folder: string;
 };
 
-const DEFAULT_FORM: FormState = { name: '', type: 'image', url: '', file_path: '', duration: 10, metadata: {}, tags: '' };
+const DEFAULT_FORM: FormState = { name: '', type: 'image', url: '', file_path: '', duration: 10, metadata: {}, tags: '', folder: '' };
 
 export default function MediaPage() {
-  const [assets, setAssets] = useState<Asset[]>([]);
+  const [assets, setAssets] = useState<(Asset & { folder?: string | null })[]>([]);
+  const [folders, setFolders] = useState<string[]>([]);
+  const [activeFolder, setActiveFolder] = useState<string | null>(null); // null = All Assets
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('all');
@@ -34,34 +36,44 @@ export default function MediaPage() {
   const [modalUploading, setModalUploading] = useState(false);
   const [ytUrl, setYtUrl] = useState('');
   const [ytLoading, setYtLoading] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [showNewFolder, setShowNewFolder] = useState(false);
+  const [movingAsset, setMovingAsset] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const modalFileRef = useRef<HTMLInputElement>(null);
+
+  const loadFolders = () => {
+    fetch('/api/folders').then(r => r.json()).then(setFolders).catch(() => {});
+  };
 
   const load = () => {
     setLoading(true);
     fetch('/api/assets').then(r => r.json()).then(d => { setAssets(d); setLoading(false); });
+    loadFolders();
   };
   useEffect(() => { load(); }, []);
 
   const filtered = assets.filter(a => {
     if (filterType !== 'all' && a.type !== filterType) return false;
     if (search && !a.name.toLowerCase().includes(search.toLowerCase())) return false;
+    if (activeFolder === '__none__') return !a.folder;
+    if (activeFolder !== null) return a.folder === activeFolder;
     return true;
   });
 
   const openAdd = (type = 'image') => {
     setEditId(null);
-    setForm({ ...DEFAULT_FORM, type });
+    setForm({ ...DEFAULT_FORM, type, folder: activeFolder && activeFolder !== '__none__' ? activeFolder : '' });
     setShowModal(true);
   };
-  const openEdit = (a: Asset) => {
+  const openEdit = (a: Asset & { folder?: string | null }) => {
     setEditId(a.id);
-    setForm({ name: a.name, type: a.type, url: a.url ?? '', file_path: a.file_path ?? '', duration: a.duration, metadata: a.metadata, tags: a.tags.join(', ') });
+    setForm({ name: a.name, type: a.type, url: a.url ?? '', file_path: a.file_path ?? '', duration: a.duration, metadata: a.metadata, tags: a.tags.join(', '), folder: a.folder ?? '' });
     setShowModal(true);
   };
 
   const save = async () => {
-    const body = { ...form, tags: form.tags.split(',').map(t => t.trim()).filter(Boolean) };
+    const body = { ...form, tags: form.tags.split(',').map(t => t.trim()).filter(Boolean), folder: form.folder.trim() || null };
     if (editId) {
       await fetch(`/api/assets/${editId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     } else {
@@ -71,13 +83,44 @@ export default function MediaPage() {
     load();
   };
 
+  const createFolder = async () => {
+    const name = newFolderName.trim();
+    if (!name) return;
+    setFolders(f => f.includes(name) ? f : [...f, name].sort());
+    setActiveFolder(name);
+    setNewFolderName('');
+    setShowNewFolder(false);
+  };
+
+  const moveToFolder = async (assetId: string, folder: string | null) => {
+    setMovingAsset(assetId);
+    await fetch(`/api/assets/${assetId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folder }),
+    });
+    setMovingAsset(null);
+    load();
+  };
+
+  const deleteFolder = async (folderName: string) => {
+    if (!confirm(`Remove folder "${folderName}"? Assets inside will be moved to No Folder.`)) return;
+    // Move all assets in this folder to null
+    const inFolder = assets.filter(a => a.folder === folderName);
+    await Promise.all(inFolder.map(a => fetch(`/api/assets/${a.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folder: null }),
+    })));
+    if (activeFolder === folderName) setActiveFolder(null);
+    load();
+  };
+
   const addPlannerAsset = async () => {
     const existing = assets.find(a => a.type === 'planner');
     if (existing) { alert('A Weekly Planner asset already exists in your library.'); return; }
-    await fetch('/api/assets', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'Weekly Planner', type: 'planner', duration: 30, metadata: {}, tags: ['planner'] }),
+    await fetch('/api/assets', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Weekly Planner', type: 'planner', duration: 30, metadata: {}, tags: ['planner'], folder: activeFolder && activeFolder !== '__none__' ? activeFolder : null }),
     });
     load();
   };
@@ -85,10 +128,8 @@ export default function MediaPage() {
   const addDayViewAsset = async () => {
     const existing = assets.find(a => a.type === 'planner-day');
     if (existing) { alert('A Daily View asset already exists in your library.'); return; }
-    await fetch('/api/assets', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'Daily View', type: 'planner-day', duration: 30, metadata: {}, tags: ['planner'] }),
+    await fetch('/api/assets', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Daily View', type: 'planner-day', duration: 30, metadata: {}, tags: ['planner'], folder: activeFolder && activeFolder !== '__none__' ? activeFolder : null }),
     });
     load();
   };
@@ -126,7 +167,7 @@ export default function MediaPage() {
     await fetch('/api/assets', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, type, file_path: url, duration: type === 'video' ? 0 : 15, metadata: {}, tags: [] }),
+      body: JSON.stringify({ name, type, file_path: url, duration: type === 'video' ? 0 : 15, metadata: {}, tags: [], folder: activeFolder && activeFolder !== '__none__' ? activeFolder : null }),
     });
     setUploading(false);
     load();
@@ -148,115 +189,227 @@ export default function MediaPage() {
     if (file) uploadFile(file);
   };
 
+  const folderCount = (name: string) => assets.filter(a => a.folder === name).length;
+  const noFolderCount = assets.filter(a => !a.folder).length;
+
   return (
-    <div className="p-6 space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Media Library</h1>
-          <p className="text-sm text-[hsl(var(--muted-foreground))]">{assets.length} assets</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => fileRef.current?.click()} disabled={uploading}
-            className="flex items-center gap-2 border border-[hsl(var(--border))] hover:border-blue-500 text-[hsl(var(--muted-foreground))] hover:text-white px-3 py-2 rounded-lg text-sm transition-colors">
-            <Upload className="w-4 h-4" />{uploading ? 'Uploading…' : 'Upload File'}
-          </button>
-          <input ref={fileRef} type="file" accept="image/*,video/*" className="hidden" onChange={e => e.target.files?.[0] && uploadFile(e.target.files[0])} />
-          <button onClick={addPlannerAsset} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium">
-            <CalendarDays className="w-4 h-4" /> Weekly View
-          </button>
-          <button onClick={addDayViewAsset} className="flex items-center gap-2 bg-violet-600 hover:bg-violet-500 text-white px-4 py-2 rounded-lg text-sm font-medium">
-            <CalendarDays className="w-4 h-4" /> Daily View
-          </button>
-          <button onClick={() => openAdd()} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium">
-            <Plus className="w-4 h-4" /> Add Asset
-          </button>
-        </div>
-      </div>
+    <div className="flex h-full overflow-hidden">
 
-      {/* YouTube downloader */}
-      <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-center gap-3">
-        <Youtube className="w-5 h-5 text-red-400 flex-shrink-0" />
-        <input value={ytUrl} onChange={e => setYtUrl(e.target.value)} placeholder="Paste YouTube URL to download as video asset…"
-          onKeyDown={e => e.key === 'Enter' && downloadYoutube()}
-          className="flex-1 bg-transparent text-white text-sm outline-none placeholder-red-300/40" />
-        <button onClick={downloadYoutube} disabled={ytLoading || !ytUrl.trim()}
-          className="flex items-center gap-1.5 bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
-          <Download className="w-4 h-4" />{ytLoading ? 'Queuing…' : 'Download'}
-        </button>
-      </div>
-
-      {/* Filters */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[hsl(var(--muted-foreground))]" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search assets…"
-            className="w-full bg-[hsl(var(--input))] border border-[hsl(var(--border))] text-white pl-9 pr-3 py-2 rounded-lg text-sm outline-none" />
+      {/* ── Folder sidebar ─────────────────────────────────────────────────── */}
+      <aside className="w-52 flex-shrink-0 border-r border-[hsl(var(--border))] flex flex-col">
+        <div className="p-3 border-b border-[hsl(var(--border))] flex items-center justify-between">
+          <span className="text-xs font-bold uppercase tracking-widest text-[hsl(var(--muted-foreground))]">
+            Folders
+          </span>
+          <button onClick={() => setShowNewFolder(v => !v)}
+            className="p-1 rounded hover:bg-[hsl(var(--secondary))] text-[hsl(var(--muted-foreground))] hover:text-white transition-colors" title="New folder">
+            <FolderPlus className="w-4 h-4" />
+          </button>
         </div>
-        <div className="flex gap-1">
-          {['all', 'image', 'video', 'youtube', 'webpage', 'text', 'clock', 'planner', 'planner-day'].map(t => (
-            <button key={t} onClick={() => setFilterType(t)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors ${filterType === t ? 'bg-blue-600 text-white' : 'text-[hsl(var(--muted-foreground))] hover:text-white hover:bg-[hsl(var(--secondary))]'}`}>
-              {t}
-            </button>
-          ))}
-        </div>
-        <button onClick={load} className="p-2 text-[hsl(var(--muted-foreground))] hover:text-white rounded-lg hover:bg-[hsl(var(--secondary))] transition-colors"><RefreshCw className="w-4 h-4" /></button>
-      </div>
 
-      {/* Drop zone + Grid */}
-      <div
-        className="min-h-[200px]"
-        onDragOver={e => e.preventDefault()}
-        onDrop={handleDrop}
-      >
-        {loading ? (
-          <div className="text-center py-16 text-[hsl(var(--muted-foreground))]">Loading…</div>
-        ) : filtered.length === 0 ? (
-          <div className="border-2 border-dashed border-[hsl(var(--border))] rounded-xl p-16 text-center">
-            <Upload className="w-12 h-12 text-[hsl(var(--muted-foreground))] mx-auto mb-4" />
-            <p className="text-[hsl(var(--muted-foreground))] font-medium">Drop files here or click Upload</p>
-            <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">Supports images, videos, and more</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            {filtered.map(a => {
-              const Icon = TYPE_ICONS[a.type] ?? ImageIcon;
-              const colorClass = TYPE_COLORS[a.type] ?? 'text-gray-400 bg-gray-500/10';
-              const isDownloading = (a.metadata as { status?: string })?.status === 'downloading';
-              return (
-                <div key={a.id} className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-xl overflow-hidden group hover:border-blue-500/50 transition-colors">
-                  <div className="aspect-video bg-[hsl(var(--secondary))] relative flex items-center justify-center">
-                    {a.file_path && (a.type === 'image') ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={a.file_path} alt={a.name} className="w-full h-full object-cover" />
-                    ) : a.thumbnail_path ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={a.thumbnail_path} alt={a.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <Icon className={`w-10 h-10 ${colorClass.split(' ')[0]}`} />
-                    )}
-                    {isDownloading && (
-                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                        <div className="text-xs text-white text-center"><RefreshCw className="w-6 h-6 animate-spin mx-auto mb-1" />Downloading…</div>
-                      </div>
-                    )}
-                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => openEdit(a)} className="p-1.5 bg-black/60 hover:bg-blue-600 text-white rounded-lg"><Edit2 className="w-3.5 h-3.5" /></button>
-                      <button onClick={() => deleteAsset(a.id)} className="p-1.5 bg-black/60 hover:bg-red-600 text-white rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
-                    </div>
-                  </div>
-                  <div className="p-3">
-                    <div className="text-sm font-medium text-white truncate">{a.name}</div>
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium capitalize ${colorClass}`}>{a.type}</span>
-                      <span className="text-xs text-[hsl(var(--muted-foreground))]">{formatDuration(a.duration)}</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+        {showNewFolder && (
+          <div className="p-2 border-b border-[hsl(var(--border))]">
+            <div className="flex gap-1">
+              <input autoFocus value={newFolderName} onChange={e => setNewFolderName(e.target.value)}
+                placeholder="Folder name"
+                onKeyDown={e => { if (e.key === 'Enter') createFolder(); if (e.key === 'Escape') setShowNewFolder(false); }}
+                className="flex-1 min-w-0 bg-[hsl(var(--input))] border border-[hsl(var(--border))] focus:border-blue-500 text-white px-2 py-1.5 rounded text-xs outline-none" />
+              <button onClick={createFolder} className="p-1.5 text-green-400 hover:bg-green-500/10 rounded"><Plus className="w-3.5 h-3.5" /></button>
+              <button onClick={() => setShowNewFolder(false)} className="p-1.5 text-[hsl(var(--muted-foreground))] hover:text-white rounded"><X className="w-3.5 h-3.5" /></button>
+            </div>
           </div>
         )}
+
+        <nav className="flex-1 overflow-y-auto py-1">
+          {/* All Assets */}
+          <button onClick={() => setActiveFolder(null)}
+            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg mx-1 text-sm transition-colors ${
+              activeFolder === null ? 'bg-blue-600 text-white' : 'text-[hsl(var(--muted-foreground))] hover:text-white hover:bg-[hsl(var(--secondary))]'
+            }`}>
+            <ImageIcon className="w-4 h-4 flex-shrink-0" />
+            <span className="flex-1 text-left truncate">All Assets</span>
+            <span className="text-xs opacity-60">{assets.length}</span>
+          </button>
+
+          {/* No Folder */}
+          <button onClick={() => setActiveFolder('__none__')}
+            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg mx-1 text-sm transition-colors ${
+              activeFolder === '__none__' ? 'bg-blue-600 text-white' : 'text-[hsl(var(--muted-foreground))] hover:text-white hover:bg-[hsl(var(--secondary))]'
+            }`}>
+            <Folder className="w-4 h-4 flex-shrink-0 opacity-40" />
+            <span className="flex-1 text-left truncate">No Folder</span>
+            <span className="text-xs opacity-60">{noFolderCount}</span>
+          </button>
+
+          {folders.length > 0 && <div className="mx-3 my-1 border-t border-[hsl(var(--border))]" />}
+
+          {/* Named folders */}
+          {folders.map(f => (
+            <div key={f} className="relative group/folder">
+              <button onClick={() => setActiveFolder(f)}
+                className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg mx-1 text-sm transition-colors ${
+                  activeFolder === f ? 'bg-blue-600 text-white' : 'text-[hsl(var(--muted-foreground))] hover:text-white hover:bg-[hsl(var(--secondary))]'
+                }`}>
+                {activeFolder === f
+                  ? <FolderOpen className="w-4 h-4 flex-shrink-0" />
+                  : <Folder className="w-4 h-4 flex-shrink-0" />}
+                <span className="flex-1 text-left truncate">{f}</span>
+                <span className="text-xs opacity-60">{folderCount(f)}</span>
+              </button>
+              <button onClick={() => deleteFolder(f)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover/folder:opacity-100 p-0.5 text-[hsl(var(--muted-foreground))] hover:text-red-400 rounded transition-all">
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+        </nav>
+      </aside>
+
+      {/* ── Main content ───────────────────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="p-4 space-y-4 overflow-y-auto flex-1">
+
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-white">
+                {activeFolder === null ? 'All Assets' : activeFolder === '__none__' ? 'No Folder' : activeFolder}
+              </h1>
+              <p className="text-sm text-[hsl(var(--muted-foreground))]">{filtered.length} asset{filtered.length !== 1 ? 's' : ''}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => fileRef.current?.click()} disabled={uploading}
+                className="flex items-center gap-2 border border-[hsl(var(--border))] hover:border-blue-500 text-[hsl(var(--muted-foreground))] hover:text-white px-3 py-2 rounded-lg text-sm transition-colors">
+                <Upload className="w-4 h-4" />{uploading ? 'Uploading…' : 'Upload'}
+              </button>
+              <input ref={fileRef} type="file" accept="image/*,video/*" className="hidden" onChange={e => e.target.files?.[0] && uploadFile(e.target.files[0])} />
+              <button onClick={addPlannerAsset} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-medium">
+                <CalendarDays className="w-4 h-4" /> Weekly
+              </button>
+              <button onClick={addDayViewAsset} className="flex items-center gap-2 bg-violet-600 hover:bg-violet-500 text-white px-3 py-2 rounded-lg text-sm font-medium">
+                <CalendarDays className="w-4 h-4" /> Daily
+              </button>
+              <button onClick={() => openAdd()} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded-lg text-sm font-medium">
+                <Plus className="w-4 h-4" /> Add
+              </button>
+            </div>
+          </div>
+
+          {/* YouTube downloader */}
+          <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex items-center gap-3">
+            <Youtube className="w-5 h-5 text-red-400 flex-shrink-0" />
+            <input value={ytUrl} onChange={e => setYtUrl(e.target.value)} placeholder="Paste YouTube URL to download as video asset…"
+              onKeyDown={e => e.key === 'Enter' && downloadYoutube()}
+              className="flex-1 bg-transparent text-white text-sm outline-none placeholder-red-300/40" />
+            <button onClick={downloadYoutube} disabled={ytLoading || !ytUrl.trim()}
+              className="flex items-center gap-1.5 bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
+              <Download className="w-4 h-4" />{ytLoading ? 'Queuing…' : 'Download'}
+            </button>
+          </div>
+
+          {/* Filters */}
+          <div className="flex items-center gap-3">
+            <div className="relative flex-1 max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[hsl(var(--muted-foreground))]" />
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search assets…"
+                className="w-full bg-[hsl(var(--input))] border border-[hsl(var(--border))] text-white pl-9 pr-3 py-2 rounded-lg text-sm outline-none" />
+            </div>
+            <div className="flex gap-1 flex-wrap">
+              {['all', 'image', 'video', 'youtube', 'webpage', 'text', 'clock', 'planner', 'planner-day'].map(t => (
+                <button key={t} onClick={() => setFilterType(t)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors ${filterType === t ? 'bg-blue-600 text-white' : 'text-[hsl(var(--muted-foreground))] hover:text-white hover:bg-[hsl(var(--secondary))]'}`}>
+                  {t}
+                </button>
+              ))}
+            </div>
+            <button onClick={load} className="p-2 text-[hsl(var(--muted-foreground))] hover:text-white rounded-lg hover:bg-[hsl(var(--secondary))] transition-colors"><RefreshCw className="w-4 h-4" /></button>
+          </div>
+
+          {/* Drop zone + Grid */}
+          <div className="min-h-[200px]" onDragOver={e => e.preventDefault()} onDrop={handleDrop}>
+            {loading ? (
+              <div className="text-center py-16 text-[hsl(var(--muted-foreground))]">Loading…</div>
+            ) : filtered.length === 0 ? (
+              <div className="border-2 border-dashed border-[hsl(var(--border))] rounded-xl p-16 text-center">
+                <Upload className="w-12 h-12 text-[hsl(var(--muted-foreground))] mx-auto mb-4" />
+                <p className="text-[hsl(var(--muted-foreground))] font-medium">Drop files here or click Upload</p>
+                <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">Supports images, videos, and more</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                {filtered.map(a => {
+                  const Icon = TYPE_ICONS[a.type] ?? ImageIcon;
+                  const colorClass = TYPE_COLORS[a.type] ?? 'text-gray-400 bg-gray-500/10';
+                  const isDownloading = (a.metadata as { status?: string })?.status === 'downloading';
+                  return (
+                    <div key={a.id} className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-xl overflow-hidden group hover:border-blue-500/50 transition-colors">
+                      <div className="aspect-video bg-[hsl(var(--secondary))] relative flex items-center justify-center">
+                        {a.file_path && a.type === 'image' ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={a.file_path} alt={a.name} className="w-full h-full object-cover" />
+                        ) : a.thumbnail_path ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={a.thumbnail_path} alt={a.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <Icon className={`w-10 h-10 ${colorClass.split(' ')[0]}`} />
+                        )}
+                        {isDownloading && (
+                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                            <div className="text-xs text-white text-center"><RefreshCw className="w-6 h-6 animate-spin mx-auto mb-1" />Downloading…</div>
+                          </div>
+                        )}
+                        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => openEdit(a)} className="p-1.5 bg-black/60 hover:bg-blue-600 text-white rounded-lg" title="Edit"><Edit2 className="w-3.5 h-3.5" /></button>
+                          <button onClick={() => deleteAsset(a.id)} className="p-1.5 bg-black/60 hover:bg-red-600 text-white rounded-lg" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
+                        </div>
+                        {/* Quick move-to-folder button */}
+                        {folders.length > 0 && (
+                          <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="relative group/move">
+                              <button className="flex items-center gap-1 bg-black/70 hover:bg-black/90 text-white px-2 py-1 rounded-lg text-xs" title="Move to folder">
+                                <FolderInput className="w-3 h-3" />
+                                {a.folder ? a.folder : 'Move'}
+                              </button>
+                              <div className="absolute bottom-full left-0 mb-1 bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-lg shadow-xl py-1 min-w-[140px] z-20 hidden group-hover/move:block">
+                                {a.folder && (
+                                  <button onClick={() => moveToFolder(a.id, null)}
+                                    disabled={movingAsset === a.id}
+                                    className="w-full text-left px-3 py-1.5 text-xs text-[hsl(var(--muted-foreground))] hover:text-white hover:bg-[hsl(var(--secondary))]">
+                                    ✕ Remove from folder
+                                  </button>
+                                )}
+                                {folders.filter(f => f !== a.folder).map(f => (
+                                  <button key={f} onClick={() => moveToFolder(a.id, f)}
+                                    disabled={movingAsset === a.id}
+                                    className="w-full text-left px-3 py-1.5 text-xs text-white hover:bg-[hsl(var(--secondary))] flex items-center gap-2">
+                                    <Folder className="w-3 h-3 text-blue-400" /> {f}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-3">
+                        <div className="text-sm font-medium text-white truncate">{a.name}</div>
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                          <span className={`text-xs px-1.5 py-0.5 rounded font-medium capitalize ${colorClass}`}>{a.type}</span>
+                          <span className="text-xs text-[hsl(var(--muted-foreground))]">{formatDuration(a.duration)}</span>
+                          {a.folder && (
+                            <span className="text-xs text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded flex items-center gap-1">
+                              <Folder className="w-2.5 h-2.5" />{a.folder}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+        </div>
       </div>
 
       {/* Add/Edit Modal */}
@@ -332,6 +485,28 @@ export default function MediaPage() {
                 <span className="text-sm text-[hsl(var(--muted-foreground))]">Tags (comma-separated)</span>
                 <input value={form.tags} onChange={e => setForm(f => ({ ...f, tags: e.target.value }))} placeholder="lobby, promo, news"
                   className="w-full bg-[hsl(var(--input))] border border-[hsl(var(--border))] focus:border-blue-500 text-white px-3 py-2 rounded-lg text-sm outline-none" />
+              </label>
+              <label className="space-y-1.5 block">
+                <span className="text-sm text-[hsl(var(--muted-foreground))]">Folder</span>
+                <div className="flex gap-2">
+                  <select value={form.folder} onChange={e => setForm(f => ({ ...f, folder: e.target.value }))}
+                    className="flex-1 bg-[hsl(var(--input))] border border-[hsl(var(--border))] text-white px-3 py-2 rounded-lg text-sm outline-none">
+                    <option value="">— No Folder —</option>
+                    {folders.map(f => <option key={f} value={f}>{f}</option>)}
+                  </select>
+                  {/* Quick create new folder inline */}
+                  {form.folder === '__new__' ? (
+                    <input autoFocus placeholder="New folder name"
+                      onBlur={e => { const v = e.target.value.trim(); setForm(f => ({ ...f, folder: v || '' })); if (v && !folders.includes(v)) setFolders(fs => [...fs, v].sort()); }}
+                      onKeyDown={e => { if (e.key === 'Enter') { const v = (e.target as HTMLInputElement).value.trim(); setForm(f => ({ ...f, folder: v || '' })); if (v && !folders.includes(v)) setFolders(fs => [...fs, v].sort()); } }}
+                      className="w-32 bg-[hsl(var(--input))] border border-blue-500 text-white px-2 py-2 rounded-lg text-sm outline-none" />
+                  ) : (
+                    <button onClick={() => setForm(f => ({ ...f, folder: '__new__' }))}
+                      className="flex items-center gap-1 border border-[hsl(var(--border))] hover:border-blue-500 text-[hsl(var(--muted-foreground))] hover:text-white px-2 py-2 rounded-lg text-sm transition-colors" title="Create new folder">
+                      <FolderPlus className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               </label>
             </div>
             <div className="flex justify-end gap-3">

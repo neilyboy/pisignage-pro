@@ -21,7 +21,9 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json();
-  const { name, type, url, duration, metadata, tags } = body;
+  const { name, type, url, duration, metadata, tags, folder } = body;
+  // folder can be explicitly set to null (unassign) or a string value
+  const hasFolder = Object.prototype.hasOwnProperty.call(body, 'folder');
   db.prepare(`
     UPDATE assets SET
       name = COALESCE(?, name),
@@ -30,12 +32,14 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       duration = COALESCE(?, duration),
       metadata = COALESCE(?, metadata),
       tags = COALESCE(?, tags),
+      folder = ${hasFolder ? '?' : 'folder'},
       updated_at = unixepoch()
     WHERE id = ?
   `).run(
     name ?? null, type ?? null, url ?? null, duration ?? null,
     metadata ? JSON.stringify(metadata) : null,
     tags ? JSON.stringify(tags) : null,
+    ...(hasFolder ? [folder ?? null] : []),
     params.id,
   );
   const row = db.prepare('SELECT * FROM assets WHERE id = ?').get(params.id) as Record<string, unknown>;

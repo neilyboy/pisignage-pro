@@ -154,6 +154,10 @@ function getDb(): Database.Database {
     ('work_start', '08:00'),
     ('work_end', '17:00');
 `);
+  // Migrations — safe to run repeatedly
+  try { _db.exec(`ALTER TABLE assets ADD COLUMN folder TEXT DEFAULT NULL`); } catch {}
+  try { _db.exec(`CREATE INDEX IF NOT EXISTS idx_assets_folder ON assets(folder)`); } catch {}
+
   return _db;
 }
 

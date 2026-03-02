@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { ListVideo, Plus, Trash2, Clock, GripVertical, X, Check, Shuffle, Repeat } from 'lucide-react';
+import { ListVideo, Plus, Trash2, Clock, GripVertical, X, Check, Shuffle, Repeat, Folder, FolderOpen } from 'lucide-react';
 import type { Playlist, Asset } from '@/lib/types';
 import { formatDuration } from '@/lib/utils';
 
@@ -8,7 +8,7 @@ interface PlaylistItem { id: string; asset_id: string; position: number; duratio
 
 export default function PlaylistsPage() {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
-  const [assets, setAssets] = useState<Asset[]>([]);
+  const [assets, setAssets] = useState<(Asset & { folder?: string | null })[]>([]);
   const [selected, setSelected] = useState<Playlist | null>(null);
   const [items, setItems] = useState<PlaylistItem[]>([]);
   const [showNew, setShowNew] = useState(false);
@@ -16,6 +16,8 @@ export default function PlaylistsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [pickerFolder, setPickerFolder] = useState<string | null>(null); // null = all
+  const [pickerSearch, setPickerSearch] = useState('');
 
   const loadAll = () => {
     Promise.all([
@@ -192,23 +194,60 @@ export default function PlaylistsPage() {
 
             {/* Asset picker */}
             <div className="w-64 border-l border-[hsl(var(--border))] flex flex-col">
-              <div className="px-4 py-3 border-b border-[hsl(var(--border))]">
+              <div className="px-3 py-2 border-b border-[hsl(var(--border))] space-y-2">
                 <h3 className="text-sm font-semibold text-white">Add Assets</h3>
+                <input value={pickerSearch} onChange={e => setPickerSearch(e.target.value)}
+                  placeholder="Search…"
+                  className="w-full bg-[hsl(var(--input))] border border-[hsl(var(--border))] text-white px-2 py-1.5 rounded text-xs outline-none" />
+                {/* Folder filter */}
+                {(() => {
+                  const folders = [...new Set(assets.map(a => a.folder).filter(Boolean))] as string[];
+                  if (folders.length === 0) return null;
+                  return (
+                    <div className="flex flex-wrap gap-1">
+                      <button onClick={() => setPickerFolder(null)}
+                        className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                          pickerFolder === null ? 'bg-blue-600 text-white' : 'text-[hsl(var(--muted-foreground))] hover:text-white hover:bg-[hsl(var(--secondary))]'
+                        }`}>
+                        All
+                      </button>
+                      {folders.map(f => (
+                        <button key={f} onClick={() => setPickerFolder(pickerFolder === f ? null : f)}
+                          className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                            pickerFolder === f ? 'bg-blue-600 text-white' : 'text-[hsl(var(--muted-foreground))] hover:text-white hover:bg-[hsl(var(--secondary))]'
+                          }`}>
+                          {pickerFolder === f ? <FolderOpen className="w-3 h-3" /> : <Folder className="w-3 h-3" />}
+                          {f}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
               <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                {assets.map(a => (
-                  <button key={a.id} onClick={() => addAsset(a)}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-[hsl(var(--secondary))] text-left transition-colors group">
-                    <div className="w-7 h-7 rounded bg-[hsl(var(--secondary))] group-hover:bg-[hsl(var(--accent))] flex items-center justify-center flex-shrink-0">
-                      <span className="text-xs">{'🖼'}</span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-medium text-white truncate">{a.name}</div>
-                      <div className="text-xs text-[hsl(var(--muted-foreground))] capitalize">{a.type} · {formatDuration(a.duration)}</div>
-                    </div>
-                    <Plus className="w-3.5 h-3.5 text-blue-400 opacity-0 group-hover:opacity-100 flex-shrink-0" />
-                  </button>
-                ))}
+                {assets
+                  .filter(a => {
+                    if (pickerFolder && a.folder !== pickerFolder) return false;
+                    if (pickerSearch && !a.name.toLowerCase().includes(pickerSearch.toLowerCase())) return false;
+                    return true;
+                  })
+                  .map(a => (
+                    <button key={a.id} onClick={() => addAsset(a)}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-[hsl(var(--secondary))] text-left transition-colors group">
+                      <div className="w-7 h-7 rounded bg-[hsl(var(--secondary))] group-hover:bg-[hsl(var(--accent))] flex items-center justify-center flex-shrink-0 text-xs">
+                        {a.type === 'image' ? '🖼' : a.type === 'video' ? '🎬' : a.type === 'clock' ? '�' : a.type.startsWith('planner') ? '📅' : '📄'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-medium text-white truncate">{a.name}</div>
+                        <div className="text-xs text-[hsl(var(--muted-foreground))] capitalize flex items-center gap-1">
+                          {a.type} · {formatDuration(a.duration)}
+                          {a.folder && <span className="text-blue-400">· {a.folder}</span>}
+                        </div>
+                      </div>
+                      <Plus className="w-3.5 h-3.5 text-blue-400 opacity-0 group-hover:opacity-100 flex-shrink-0" />
+                    </button>
+                  ))
+                }
               </div>
             </div>
           </>
