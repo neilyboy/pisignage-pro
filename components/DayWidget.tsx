@@ -284,7 +284,7 @@ export default function DayWidget() {
         ) : (
           <div className="h-full flex flex-col gap-3 overflow-hidden"
             style={{ maxHeight: '100%' }}>
-            {sorted.map((ev, i) => (
+            {sorted.map((ev) => (
               <EventRow
                 key={ev.id}
                 event={ev}
