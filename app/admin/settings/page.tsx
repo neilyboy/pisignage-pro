@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { Copy, Check, Terminal, Download, Upload, Image as ImageIcon, Clock, Save, Monitor, RefreshCw, Wifi, WifiOff, Activity, Settings2, ChevronDown, ChevronRight, Palette } from 'lucide-react';
+import { Copy, Check, Terminal, Download, Upload, Image as ImageIcon, Clock, Save, Monitor, RefreshCw, Wifi, WifiOff, Activity, Settings2, ChevronDown, ChevronRight, Palette, CloudSun } from 'lucide-react';
 import type { Device } from '@/lib/types';
 import { THEMES, type DayTheme } from '@/lib/themes';
 
@@ -16,6 +16,11 @@ export default function SettingsPage() {
   const [workEnd, setWorkEnd] = useState('17:00');
   const [activeThemeId, setActiveThemeId] = useState('midnight');
   const [customTheme, setCustomTheme] = useState<Partial<DayTheme>>({});
+  const [weatherApiKey, setWeatherApiKey] = useState('');
+  const [weatherLocation, setWeatherLocation] = useState('');
+  const [weatherUnits, setWeatherUnits] = useState('imperial');
+  const [weatherTestResult, setWeatherTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [weatherTesting, setWeatherTesting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const logoFileRef = useRef<HTMLInputElement>(null);
   const [devices, setDevices] = useState<Device[]>([]);
@@ -78,6 +83,9 @@ export default function SettingsPage() {
           work_end: workEnd,
           display_theme: activeThemeId,
           display_theme_custom: JSON.stringify(customTheme),
+          weather_api_key: weatherApiKey,
+          weather_location: weatherLocation,
+          weather_units: weatherUnits,
         }),
       });
       logPush('Settings pushed to all displays', true);
@@ -97,6 +105,9 @@ export default function SettingsPage() {
       setWorkEnd(s.work_end ?? '17:00');
       setActiveThemeId(s.display_theme ?? 'midnight');
       if (s.display_theme_custom) { try { setCustomTheme(JSON.parse(s.display_theme_custom)); } catch {} }
+      setWeatherApiKey(s.weather_api_key ?? '');
+      setWeatherLocation(s.weather_location ?? '');
+      setWeatherUnits(s.weather_units ?? 'imperial');
     });
     loadDevices();
     const t = setInterval(loadDevices, 15000);
@@ -117,11 +128,33 @@ export default function SettingsPage() {
         work_end: workEnd,
         display_theme: activeThemeId,
         display_theme_custom: JSON.stringify(customTheme),
+        weather_api_key: weatherApiKey,
+        weather_location: weatherLocation,
+        weather_units: weatherUnits,
       }),
     });
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
+  };
+
+  const testWeather = async () => {
+    setWeatherTesting(true);
+    setWeatherTestResult(null);
+    // Save first so the API picks up new values
+    await fetch('/api/settings', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ weather_api_key: weatherApiKey, weather_location: weatherLocation, weather_units: weatherUnits }),
+    });
+    try {
+      const res = await fetch('/api/weather');
+      const d = await res.json();
+      if (d.error) setWeatherTestResult({ ok: false, msg: d.error });
+      else setWeatherTestResult({ ok: true, msg: `${d.city}, ${d.country} · ${d.temp}° · ${d.description}` });
+    } catch (e) {
+      setWeatherTestResult({ ok: false, msg: String(e) });
+    }
+    setWeatherTesting(false);
   };
 
   const uploadLogo = async (file: File) => {
@@ -471,6 +504,81 @@ sudo reboot`;
             </div>
           </div>
         )}
+      </div>
+
+      {/* ── Weather Widget ───────────────────────────────────────────────────── */}
+      <div className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-2xl p-6 space-y-5">
+        <div className="flex items-center gap-2">
+          <CloudSun className="w-5 h-5 text-sky-400" />
+          <h2 className="font-semibold text-white text-lg">Weather Widget</h2>
+        </div>
+        <p className="text-sm text-[hsl(var(--muted-foreground))]">
+          Displays live weather on your screens. Uses{' '}
+          <a href="https://openweathermap.org/api" target="_blank" rel="noopener noreferrer" className="text-sky-400 underline hover:text-sky-300">
+            OpenWeatherMap
+          </a>{' '}
+          (free tier, 60 calls/min). Add as a <strong className="text-white">Weather Widget</strong> asset in Media, then put it in a playlist.
+        </p>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <label className="space-y-1.5 block">
+            <span className="text-sm text-[hsl(var(--muted-foreground))]">OpenWeatherMap API Key</span>
+            <input
+              type="password"
+              value={weatherApiKey}
+              onChange={e => setWeatherApiKey(e.target.value)}
+              placeholder="e.g. a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+              className="w-full bg-[hsl(var(--input))] border border-[hsl(var(--border))] focus:border-sky-500 text-white px-3 py-2 rounded-lg text-sm outline-none font-mono"
+            />
+          </label>
+          <label className="space-y-1.5 block">
+            <span className="text-sm text-[hsl(var(--muted-foreground))]">Location</span>
+            <input
+              type="text"
+              value={weatherLocation}
+              onChange={e => setWeatherLocation(e.target.value)}
+              placeholder="e.g. Chicago, US or London, GB"
+              className="w-full bg-[hsl(var(--input))] border border-[hsl(var(--border))] focus:border-sky-500 text-white px-3 py-2 rounded-lg text-sm outline-none"
+            />
+          </label>
+        </div>
+
+        <div className="flex items-center gap-4 flex-wrap">
+          <label className="space-y-1.5 block">
+            <span className="text-sm text-[hsl(var(--muted-foreground))]">Units</span>
+            <select value={weatherUnits} onChange={e => setWeatherUnits(e.target.value)}
+              className="bg-[hsl(var(--input))] border border-[hsl(var(--border))] text-white px-3 py-2 rounded-lg text-sm outline-none">
+              <option value="imperial">Imperial (°F, mph)</option>
+              <option value="metric">Metric (°C, m/s)</option>
+              <option value="standard">Standard (K)</option>
+            </select>
+          </label>
+
+          <div className="flex items-end gap-3 pb-0.5 flex-1">
+            <button
+              onClick={testWeather}
+              disabled={weatherTesting || !weatherApiKey || !weatherLocation}
+              className="flex items-center gap-2 bg-sky-600/20 hover:bg-sky-600/40 border border-sky-500/30 text-sky-300 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-40">
+              <CloudSun className={`w-4 h-4 ${weatherTesting ? 'animate-pulse' : ''}`} />
+              {weatherTesting ? 'Testing…' : 'Test Connection'}
+            </button>
+            {weatherTestResult && (
+              <div className={`flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-lg ${
+                weatherTestResult.ok ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
+              }`}>
+                {weatherTestResult.ok ? '✅' : '❌'} {weatherTestResult.msg}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-sky-500/5 border border-sky-500/20 rounded-xl p-3 text-xs text-[hsl(var(--muted-foreground))] space-y-1">
+          <div className="font-bold text-sky-400 uppercase tracking-widest mb-1">Setup Instructions</div>
+          <div>1. Sign up free at <span className="text-white">openweathermap.org</span> → API Keys → copy your key above.</div>
+          <div>2. Enter a location like <span className="text-white font-mono">Chicago, US</span> or <span className="text-white font-mono">London, GB</span></div>
+          <div>3. Click <span className="text-white">Test Connection</span> to verify, then <span className="text-white">Save Settings</span>.</div>
+          <div>4. In <span className="text-white">Media</span>, add a new asset → type <span className="text-white">Weather Widget</span> → add to a playlist.</div>
+        </div>
       </div>
 
       {/* ── Device Tools ─────────────────────────────────────────────────────── */}

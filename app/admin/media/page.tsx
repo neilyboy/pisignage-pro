@@ -1,18 +1,18 @@
 'use client';
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { Image as ImageIcon, Video, Globe, Type, Youtube, Clock, Upload, Plus, Trash2, Edit2, Search, X, Download, RefreshCw, CalendarDays, Folder, FolderOpen, FolderPlus, FolderInput } from 'lucide-react';
+import { Image as ImageIcon, Video, Globe, Type, Youtube, Clock, Upload, Plus, Trash2, Edit2, Search, X, Download, RefreshCw, CalendarDays, CloudSun, Folder, FolderOpen, FolderPlus, FolderInput } from 'lucide-react';
 import type { Asset } from '@/lib/types';
 import { formatDuration } from '@/lib/utils';
 
 const TYPE_ICONS: Record<string, React.ElementType> = {
-  image: ImageIcon, video: Video, webpage: Globe, text: Type, youtube: Youtube, clock: Clock, html: Type, planner: CalendarDays, 'planner-day': CalendarDays,
+  image: ImageIcon, video: Video, webpage: Globe, text: Type, youtube: Youtube, clock: Clock, html: Type, planner: CalendarDays, 'planner-day': CalendarDays, weather: CloudSun,
 };
 const TYPE_COLORS: Record<string, string> = {
   image: 'text-purple-400 bg-purple-500/10', video: 'text-blue-400 bg-blue-500/10',
   webpage: 'text-green-400 bg-green-500/10', text: 'text-yellow-400 bg-yellow-500/10',
   youtube: 'text-red-400 bg-red-500/10', clock: 'text-cyan-400 bg-cyan-500/10',
   html: 'text-orange-400 bg-orange-500/10', planner: 'text-indigo-400 bg-indigo-500/10',
-  'planner-day': 'text-violet-400 bg-violet-500/10',
+  'planner-day': 'text-violet-400 bg-violet-500/10', weather: 'text-sky-400 bg-sky-500/10',
 };
 
 type FormState = {
@@ -468,8 +468,8 @@ export default function MediaPage() {
                 <span className="text-sm text-[hsl(var(--muted-foreground))]">Type</span>
                 <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
                   className="w-full bg-[hsl(var(--input))] border border-[hsl(var(--border))] text-white px-3 py-2 rounded-lg text-sm outline-none">
-                  {['image', 'video', 'webpage', 'text', 'html', 'clock', 'planner', 'planner-day'].map(t => {
-                    const labels: Record<string,string> = { 'planner': 'Weekly Planner', 'planner-day': 'Daily View' };
+                  {['image', 'video', 'webpage', 'text', 'html', 'clock', 'planner', 'planner-day', 'weather'].map(t => {
+                    const labels: Record<string,string> = { 'planner': 'Weekly Planner', 'planner-day': 'Daily View', 'weather': 'Weather Widget' };
                     return <option key={t} value={t}>{labels[t] ?? t.charAt(0).toUpperCase() + t.slice(1)}</option>;
                   })}
                 </select>

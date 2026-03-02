@@ -157,6 +157,14 @@ function getDb(): Database.Database {
   // Migrations — safe to run repeatedly
   try { _db.exec(`ALTER TABLE assets ADD COLUMN folder TEXT DEFAULT NULL`); } catch {}
   try { _db.exec(`CREATE INDEX IF NOT EXISTS idx_assets_folder ON assets(folder)`); } catch {}
+  try { _db.exec(`ALTER TABLE announcements ADD COLUMN start_at INTEGER DEFAULT NULL`); } catch {}
+  // Weather settings defaults
+  const wx = _db.prepare(`SELECT value FROM settings WHERE key = 'weather_api_key'`).get();
+  if (!wx) {
+    _db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`).run('weather_api_key', '');
+    _db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`).run('weather_location', '');
+    _db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`).run('weather_units', 'imperial');
+  }
 
   return _db;
 }

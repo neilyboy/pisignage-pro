@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation';
 import type { Playlist, Asset } from '@/lib/types';
 import PlannerWidget from '@/components/PlannerWidget';
 import DayWidget from '@/components/DayWidget';
+import WeatherWidget from '@/components/WeatherWidget';
 
 interface BrandSettings {
   brand_enabled: string;
@@ -190,6 +191,8 @@ export default function DisplayPage() {
         return <PlannerWidget />;
       case 'planner-day':
         return <DayWidget />;
+      case 'weather':
+        return <WeatherWidget />;
       default:
         return <div className="w-full h-full bg-black flex items-center justify-center text-white">{asset.name}</div>;
     }
