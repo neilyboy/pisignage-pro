@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
+import { pushToAll } from '@/lib/sse';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,5 +21,6 @@ export async function POST(req: NextRequest) {
     for (const [key, value] of entries) upsert.run(key, value);
   });
   upsertMany(Object.entries(body));
+  pushToAll({ type: 'settings' });
   return NextResponse.json({ success: true });
 }

@@ -96,6 +96,9 @@ export default function DisplayPage() {
       try {
         const event = JSON.parse(e.data);
         if (event.type === 'playlist') loadPlaylist(event.playlist_id);
+        if (event.type === 'settings') {
+          fetch('/api/settings').then(r => r.json()).then((s: Record<string, string>) => setBrand(s as unknown as BrandSettings)).catch(() => {});
+        }
         if (event.type === 'announcement') {
           setAnnouncement({ text: event.text, color: event.color, bg_color: event.bg_color, speed: event.speed ?? 50 });
           setTimeout(() => setAnnouncement(null), 30000);
