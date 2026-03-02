@@ -218,8 +218,6 @@ export default function DayWidget() {
   const [kpis, setKpis] = useState<KpiItem[]>([]);
   const [now, setNow] = useState(new Date());
 
-  const todayStr = formatDate(now);
-
   const load = useCallback(() => {
     // Fetch all events and filter client-side to avoid timezone issues with week param
     fetch(`/api/planner`).then(r => r.json()).then(d => {
