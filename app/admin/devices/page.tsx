@@ -14,22 +14,23 @@ export default function DevicesPage() {
 
   const load = () => {
     setLoading(true);
-    fetch('/api/devices').then(r => r.json()).then(d => { setDevices(d); setLoading(false); });
+    return fetch('/api/devices').then(r => r.json()).then(d => { setDevices(d); setLoading(false); });
   };
 
   useEffect(() => { load(); const t = setInterval(load, 10000); return () => clearInterval(t); }, []);
 
   const adopt = async (device: Device) => {
     if (!adoptName.trim()) return;
-    await fetch(`/api/devices/${device.id}`, {
+    const res = await fetch(`/api/devices/${device.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: adoptName, location: adoptLocation, status: 'active' }),
     });
+    if (!res.ok) return;
     setAdoptingId(null);
     setAdoptName('');
     setAdoptLocation('');
-    load();
+    await load();
   };
 
   const deleteDevice = async (id: string) => {
