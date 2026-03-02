@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { Copy, Check, Terminal, Download, Upload, Image as ImageIcon, Clock, Save } from 'lucide-react';
+import { Copy, Check, Terminal, Download, Upload, Image as ImageIcon, Clock, Save, Monitor, RefreshCw, Wifi, WifiOff, AlertTriangle, Activity, Settings2, ChevronDown, ChevronRight } from 'lucide-react';
+import type { Device } from '@/lib/types';
 
 export default function SettingsPage() {
   const [copied, setCopied] = useState<string | null>(null);
@@ -14,6 +15,72 @@ export default function SettingsPage() {
   const [workEnd, setWorkEnd] = useState('17:00');
   const [uploading, setUploading] = useState(false);
   const logoFileRef = useRef<HTMLInputElement>(null);
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [devicesLoading, setDevicesLoading] = useState(true);
+  const [pushingDevice, setPushingDevice] = useState<string | null>(null);
+  const [pushLog, setPushLog] = useState<{ time: string; msg: string; ok: boolean }[]>([]);
+  const [showDiag, setShowDiag] = useState(false);
+
+  const loadDevices = () => {
+    setDevicesLoading(true);
+    fetch('/api/devices').then(r => r.json()).then(d => { setDevices(d); setDevicesLoading(false); }).catch(() => setDevicesLoading(false));
+  };
+
+  const logPush = (msg: string, ok: boolean) => {
+    const time = new Date().toLocaleTimeString();
+    setPushLog(l => [{ time, msg, ok }, ...l].slice(0, 20));
+  };
+
+  const pushDevice = async (deviceId: string, type: string, label: string) => {
+    setPushingDevice(deviceId + type);
+    try {
+      const res = await fetch(`/api/devices/${deviceId}/push`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type }),
+      });
+      const ok = res.ok;
+      const dev = devices.find(d => d.id === deviceId);
+      logPush(`${label} → ${dev?.name ?? deviceId.slice(0, 8)}`, ok);
+    } catch {
+      logPush(`${label} → FAILED`, false);
+    }
+    setPushingDevice(null);
+  };
+
+  const pushAll = async (type: string, label: string) => {
+    setPushingDevice('all-' + type);
+    const active = devices.filter(d => d.status === 'active');
+    if (active.length === 0) { logPush(`${label}: no online devices`, false); setPushingDevice(null); return; }
+    await Promise.all(active.map(d => fetch(`/api/devices/${d.id}/push`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type }),
+    })));
+    logPush(`${label} → ${active.length} device${active.length !== 1 ? 's' : ''}`, true);
+    setPushingDevice(null);
+  };
+
+  const pushSettingsRefresh = async () => {
+    setPushingDevice('all-settings');
+    try {
+      await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brand_enabled: String(brandEnabled),
+          brand_logo_url: brandLogoUrl,
+          brand_position: brandPosition,
+          brand_size: brandSize,
+          work_start: workStart,
+          work_end: workEnd,
+        }),
+      });
+      logPush('Settings pushed to all displays', true);
+    } catch {
+      logPush('Settings push FAILED', false);
+    }
+    setPushingDevice(null);
+  };
 
   useEffect(() => {
     fetch('/api/settings').then(r => r.json()).then((s: Record<string, string>) => {
@@ -24,6 +91,9 @@ export default function SettingsPage() {
       setWorkStart(s.work_start ?? '08:00');
       setWorkEnd(s.work_end ?? '17:00');
     });
+    loadDevices();
+    const t = setInterval(loadDevices, 15000);
+    return () => clearInterval(t);
   }, []);
 
   const saveSettings = async () => {
@@ -264,6 +334,180 @@ sudo reboot`;
               return `${Math.floor(mins / 60)}h ${mins % 60}m work day`;
             })()}
           </div>
+        </div>
+      </div>
+
+      {/* ── Device Tools ─────────────────────────────────────────────────────── */}
+      <div className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-2xl p-6 space-y-5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Settings2 className="w-5 h-5 text-orange-400" />
+            <h2 className="font-semibold text-white text-lg">Device Tools</h2>
+          </div>
+          <button onClick={loadDevices} className="flex items-center gap-1.5 text-xs text-[hsl(var(--muted-foreground))] hover:text-white transition-colors">
+            <RefreshCw className={`w-3.5 h-3.5 ${devicesLoading ? 'animate-spin' : ''}`} /> Refresh
+          </button>
+        </div>
+
+        {/* Global action buttons */}
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => pushAll('reload', 'Force Reload')}
+            disabled={!!pushingDevice}
+            className="flex items-center gap-2 bg-orange-600/20 hover:bg-orange-600/40 border border-orange-500/30 text-orange-300 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-40">
+            <RefreshCw className={`w-4 h-4 ${pushingDevice === 'all-reload' ? 'animate-spin' : ''}`} />
+            Reload All Displays
+          </button>
+          <button
+            onClick={pushSettingsRefresh}
+            disabled={!!pushingDevice}
+            className="flex items-center gap-2 bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/30 text-blue-300 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-40">
+            <Activity className={`w-4 h-4 ${pushingDevice === 'all-settings' ? 'animate-spin' : ''}`} />
+            Push Settings to All
+          </button>
+        </div>
+
+        {/* Per-device list */}
+        <div className="space-y-2">
+          <div className="text-xs font-bold uppercase tracking-widest text-[hsl(var(--muted-foreground))] mb-1">
+            Connected Devices ({devices.filter(d => d.status === 'active').length} online)
+          </div>
+          {devicesLoading && devices.length === 0 ? (
+            <div className="text-sm text-[hsl(var(--muted-foreground))] py-2">Loading…</div>
+          ) : devices.length === 0 ? (
+            <div className="text-sm text-[hsl(var(--muted-foreground))] py-2">No devices registered yet.</div>
+          ) : (
+            devices.map(dev => {
+              const isOnline = dev.status === 'active';
+              const lastSeen = dev.last_seen ? new Date(dev.last_seen * 1000) : null;
+              const secAgo = lastSeen ? Math.floor((Date.now() - lastSeen.getTime()) / 1000) : null;
+              const lastSeenLabel = secAgo === null ? 'Never'
+                : secAgo < 60 ? `${secAgo}s ago`
+                : secAgo < 3600 ? `${Math.floor(secAgo / 60)}m ago`
+                : `${Math.floor(secAgo / 3600)}h ago`;
+
+              return (
+                <div key={dev.id} className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${
+                  isOnline
+                    ? 'bg-green-500/5 border-green-500/20'
+                    : 'bg-white/2 border-[hsl(var(--border))] opacity-60'
+                }`}>
+                  {/* Status indicator */}
+                  <div className="flex-shrink-0">
+                    {isOnline
+                      ? <Wifi className="w-4 h-4 text-green-400" />
+                      : <WifiOff className="w-4 h-4 text-gray-600" />}
+                  </div>
+
+                  {/* Device info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-white truncate">{dev.name ?? 'Unnamed Device'}</span>
+                      <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full ${
+                        isOnline ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-500'
+                      }`}>{dev.status}</span>
+                    </div>
+                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                      <span className="text-xs text-[hsl(var(--muted-foreground))]">
+                        <Monitor className="w-3 h-3 inline mr-1" />{dev.ip_address ?? 'No IP'}
+                      </span>
+                      <span className="text-xs text-[hsl(var(--muted-foreground))]">
+                        Last seen: {lastSeenLabel}
+                      </span>
+                      {dev.resolution && (
+                        <span className="text-xs text-[hsl(var(--muted-foreground))]">{dev.resolution}</span>
+                      )}
+                      {dev.version && (
+                        <span className="text-xs text-[hsl(var(--muted-foreground))]">v{dev.version}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Per-device actions */}
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <button
+                      onClick={() => pushDevice(dev.id, 'reload', 'Reload')}
+                      disabled={!!pushingDevice || !isOnline}
+                      title="Force reload browser"
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-orange-500/30 text-orange-300 hover:bg-orange-500/20 disabled:opacity-30 transition-colors">
+                      <RefreshCw className={`w-3.5 h-3.5 ${pushingDevice === dev.id + 'reload' ? 'animate-spin' : ''}`} />
+                      Reload
+                    </button>
+                    <button
+                      onClick={() => pushDevice(dev.id, 'settings', 'Push Settings')}
+                      disabled={!!pushingDevice || !isOnline}
+                      title="Push latest settings"
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-blue-500/30 text-blue-300 hover:bg-blue-500/20 disabled:opacity-30 transition-colors">
+                      <Activity className={`w-3.5 h-3.5 ${pushingDevice === dev.id + 'settings' ? 'animate-spin' : ''}`} />
+                      Settings
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Push log / diagnostics */}
+        <div>
+          <button onClick={() => setShowDiag(v => !v)}
+            className="flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))] hover:text-white transition-colors">
+            {showDiag ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+            <span className="font-bold uppercase tracking-widest">Push Log</span>
+            {pushLog.length > 0 && (
+              <span className={`px-1.5 py-0.5 rounded-full font-bold ${pushLog[0].ok ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                {pushLog[0].ok ? '✓' : '✗'} {pushLog[0].msg}
+              </span>
+            )}
+          </button>
+
+          {showDiag && (
+            <div className="mt-3 bg-[hsl(222,47%,6%)] border border-[hsl(var(--border))] rounded-xl overflow-hidden">
+              {/* Diagnostic info */}
+              <div className="px-4 py-3 border-b border-[hsl(var(--border))] grid grid-cols-3 gap-4 text-xs">
+                <div>
+                  <div className="text-[hsl(var(--muted-foreground))] mb-0.5">Server URL</div>
+                  <div className="text-white font-mono">{typeof window !== 'undefined' ? window.location.origin : '—'}</div>
+                </div>
+                <div>
+                  <div className="text-[hsl(var(--muted-foreground))] mb-0.5">Settings API</div>
+                  <a href="/api/settings" target="_blank" className="text-blue-400 hover:underline font-mono">/api/settings ↗</a>
+                </div>
+                <div>
+                  <div className="text-[hsl(var(--muted-foreground))] mb-0.5">Devices API</div>
+                  <a href="/api/devices" target="_blank" className="text-blue-400 hover:underline font-mono">/api/devices ↗</a>
+                </div>
+                <div>
+                  <div className="text-[hsl(var(--muted-foreground))] mb-0.5">Total Devices</div>
+                  <div className="text-white">{devices.length}</div>
+                </div>
+                <div>
+                  <div className="text-[hsl(var(--muted-foreground))] mb-0.5">Online</div>
+                  <div className="text-green-400">{devices.filter(d => d.status === 'active').length}</div>
+                </div>
+                <div>
+                  <div className="text-[hsl(var(--muted-foreground))] mb-0.5">Offline</div>
+                  <div className="text-red-400">{devices.filter(d => d.status !== 'active').length}</div>
+                </div>
+              </div>
+              {/* Log entries */}
+              {pushLog.length === 0 ? (
+                <div className="px-4 py-3 text-xs text-[hsl(var(--muted-foreground))]">No actions yet. Use the buttons above to push commands to devices.</div>
+              ) : (
+                <div className="divide-y divide-[hsl(var(--border))] max-h-48 overflow-y-auto">
+                  {pushLog.map((entry, i) => (
+                    <div key={i} className="flex items-center gap-3 px-4 py-2">
+                      <span className={`flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-black ${
+                        entry.ok ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                      }`}>{entry.ok ? '✓' : '✗'}</span>
+                      <span className="text-xs font-mono text-[hsl(var(--muted-foreground))] flex-shrink-0">{entry.time}</span>
+                      <span className={`text-xs ${entry.ok ? 'text-white' : 'text-red-400'}`}>{entry.msg}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
