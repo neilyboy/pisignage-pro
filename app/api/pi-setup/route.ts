@@ -105,6 +105,7 @@ export async function GET(req: NextRequest) {
     'done) &',
     '',
     'exec chromium \\',
+    '  --no-memcheck \\',
     '  --kiosk \\',
     '  --noerrdialogs \\',
     '  --disable-infobars \\',
