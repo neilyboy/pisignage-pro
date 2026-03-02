@@ -4,7 +4,11 @@ import type { PlannerEvent, KpiItem } from '@/lib/types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function formatDate(date: Date): string {
-  return date.toISOString().split('T')[0];
+  // Use local date, not UTC (toISOString always returns UTC which can be wrong day)
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 function parseTime(t: string): number {
@@ -217,11 +221,13 @@ export default function DayWidget() {
   const todayStr = formatDate(now);
 
   const load = useCallback(() => {
-    fetch(`/api/planner?week=${todayStr}`).then(r => r.json()).then(d => {
-      setEvents((d as PlannerEvent[]).filter((e: PlannerEvent) => e.date === todayStr));
+    // Fetch all events and filter client-side to avoid timezone issues with week param
+    fetch(`/api/planner`).then(r => r.json()).then(d => {
+      const today = formatDate(new Date());
+      setEvents((d as PlannerEvent[]).filter((e: PlannerEvent) => e.date === today));
     }).catch(() => {});
     fetch('/api/kpi').then(r => r.json()).then(setKpis).catch(() => {});
-  }, [todayStr]);
+  }, []);
 
   useEffect(() => {
     load();
