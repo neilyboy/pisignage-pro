@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
 import { generateId } from '@/lib/utils';
+import { pushToDevice } from '@/lib/sse';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,6 +69,11 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   }
 
   const row = db.prepare('SELECT * FROM playlists WHERE id = ?').get(params.id) as Record<string, unknown>;
+
+  // Auto-push to every device that currently has this playlist assigned
+  const affected = db.prepare('SELECT id FROM devices WHERE current_playlist_id = ?').all(params.id) as { id: string }[];
+  affected.forEach(device => pushToDevice(device.id, { type: 'playlist', playlist_id: params.id }));
+
   return NextResponse.json(parsePlaylist(row));
 }
 
