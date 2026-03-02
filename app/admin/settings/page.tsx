@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { Copy, Check, Terminal, Download, Upload, Image as ImageIcon, Clock, Save, Monitor, RefreshCw, Wifi, WifiOff, AlertTriangle, Activity, Settings2, ChevronDown, ChevronRight } from 'lucide-react';
+import { Copy, Check, Terminal, Download, Upload, Image as ImageIcon, Clock, Save, Monitor, RefreshCw, Wifi, WifiOff, Activity, Settings2, ChevronDown, ChevronRight } from 'lucide-react';
 import type { Device } from '@/lib/types';
 
 export default function SettingsPage() {

@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { Image as ImageIcon, Video, Globe, Type, Youtube, Clock, Upload, Plus, Trash2, Edit2, Search, X, Download, RefreshCw, CalendarDays, Folder, FolderOpen, FolderPlus, FolderInput } from 'lucide-react';
 import type { Asset } from '@/lib/types';
 import { formatDuration } from '@/lib/utils';
@@ -48,12 +48,12 @@ export default function MediaPage() {
     fetch('/api/folders').then(r => r.json()).then(setFolders).catch(() => {});
   };
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     fetch('/api/assets').then(r => r.json()).then(d => { setAssets(d); setLoading(false); });
     loadFolders();
-  };
-  useEffect(() => { load(); }, []);
+  }, []);
+  useEffect(() => { load(); }, [load]);
 
   const filtered = assets.filter(a => {
     if (filterType !== 'all' && a.type !== filterType) return false;
