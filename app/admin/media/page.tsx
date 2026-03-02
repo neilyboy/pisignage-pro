@@ -1,17 +1,17 @@
 'use client';
 import { useEffect, useState, useRef } from 'react';
-import { Image as ImageIcon, Video, Globe, Type, Youtube, Clock, Upload, Plus, Trash2, Edit2, Search, X, Download, RefreshCw } from 'lucide-react';
+import { Image as ImageIcon, Video, Globe, Type, Youtube, Clock, Upload, Plus, Trash2, Edit2, Search, X, Download, RefreshCw, CalendarDays } from 'lucide-react';
 import type { Asset } from '@/lib/types';
 import { formatDuration } from '@/lib/utils';
 
 const TYPE_ICONS: Record<string, React.ElementType> = {
-  image: ImageIcon, video: Video, webpage: Globe, text: Type, youtube: Youtube, clock: Clock, html: Type,
+  image: ImageIcon, video: Video, webpage: Globe, text: Type, youtube: Youtube, clock: Clock, html: Type, planner: CalendarDays,
 };
 const TYPE_COLORS: Record<string, string> = {
   image: 'text-purple-400 bg-purple-500/10', video: 'text-blue-400 bg-blue-500/10',
   webpage: 'text-green-400 bg-green-500/10', text: 'text-yellow-400 bg-yellow-500/10',
   youtube: 'text-red-400 bg-red-500/10', clock: 'text-cyan-400 bg-cyan-500/10',
-  html: 'text-orange-400 bg-orange-500/10',
+  html: 'text-orange-400 bg-orange-500/10', planner: 'text-indigo-400 bg-indigo-500/10',
 };
 
 type FormState = {
@@ -67,6 +67,17 @@ export default function MediaPage() {
       await fetch('/api/assets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     }
     setShowModal(false);
+    load();
+  };
+
+  const addPlannerAsset = async () => {
+    const existing = assets.find(a => a.type === 'planner');
+    if (existing) { alert('A Planner asset already exists in your library. Add it to a playlist from the Playlists page.'); return; }
+    await fetch('/api/assets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Weekly Planner', type: 'planner', duration: 30, metadata: {}, tags: ['planner'] }),
+    });
     load();
   };
 
@@ -138,6 +149,9 @@ export default function MediaPage() {
             <Upload className="w-4 h-4" />{uploading ? 'Uploading…' : 'Upload File'}
           </button>
           <input ref={fileRef} type="file" accept="image/*,video/*" className="hidden" onChange={e => e.target.files?.[0] && uploadFile(e.target.files[0])} />
+          <button onClick={addPlannerAsset} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium">
+            <CalendarDays className="w-4 h-4" /> Add Planner
+          </button>
           <button onClick={() => openAdd()} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium">
             <Plus className="w-4 h-4" /> Add Asset
           </button>
@@ -164,7 +178,7 @@ export default function MediaPage() {
             className="w-full bg-[hsl(var(--input))] border border-[hsl(var(--border))] text-white pl-9 pr-3 py-2 rounded-lg text-sm outline-none" />
         </div>
         <div className="flex gap-1">
-          {['all', 'image', 'video', 'youtube', 'webpage', 'text', 'clock'].map(t => (
+          {['all', 'image', 'video', 'youtube', 'webpage', 'text', 'clock', 'planner'].map(t => (
             <button key={t} onClick={() => setFilterType(t)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors ${filterType === t ? 'bg-blue-600 text-white' : 'text-[hsl(var(--muted-foreground))] hover:text-white hover:bg-[hsl(var(--secondary))]'}`}>
               {t}
@@ -243,7 +257,7 @@ export default function MediaPage() {
                 <span className="text-sm text-[hsl(var(--muted-foreground))]">Type</span>
                 <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
                   className="w-full bg-[hsl(var(--input))] border border-[hsl(var(--border))] text-white px-3 py-2 rounded-lg text-sm outline-none">
-                  {['image', 'video', 'webpage', 'text', 'html', 'clock'].map(t => <option key={t} value={t} className="capitalize">{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
+                  {['image', 'video', 'webpage', 'text', 'html', 'clock', 'planner'].map(t => <option key={t} value={t} className="capitalize">{t === 'planner' ? 'Weekly Planner' : t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
                 </select>
               </label>
               <label className="space-y-1.5 block">

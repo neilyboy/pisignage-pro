@@ -1,5 +1,5 @@
 export type DeviceStatus = 'pending' | 'active' | 'offline';
-export type AssetType = 'image' | 'video' | 'webpage' | 'youtube' | 'text' | 'html' | 'clock' | 'weather';
+export type AssetType = 'image' | 'video' | 'webpage' | 'youtube' | 'text' | 'html' | 'clock' | 'weather' | 'planner';
 export type Transition = 'fade' | 'slide' | 'zoom' | 'none';
 
 export interface Device {

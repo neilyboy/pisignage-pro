@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import type { Playlist, Asset } from '@/lib/types';
+import PlannerWidget from '@/components/PlannerWidget';
 
 interface PlaylistItem {
   id: string;
@@ -159,6 +160,8 @@ export default function DisplayPage() {
         );
       case 'clock':
         return <ClockWidget />;
+      case 'planner':
+        return <PlannerWidget />;
       default:
         return <div className="w-full h-full bg-black flex items-center justify-center text-white">{asset.name}</div>;
     }
