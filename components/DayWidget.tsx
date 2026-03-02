@@ -219,10 +219,9 @@ export default function DayWidget() {
   const [now, setNow] = useState(new Date());
 
   const load = useCallback(() => {
-    // Fetch all events and filter client-side to avoid timezone issues with week param
-    fetch(`/api/planner`).then(r => r.json()).then(d => {
-      const today = formatDate(new Date());
-      setEvents((d as PlannerEvent[]).filter((e: PlannerEvent) => e.date === today));
+    // Use ?today=1 so the SERVER determines today's date — avoids Pi browser running in UTC
+    fetch(`/api/planner?today=1`).then(r => r.json()).then(d => {
+      setEvents(d as PlannerEvent[]);
     }).catch(() => {});
     fetch('/api/kpi').then(r => r.json()).then(setKpis).catch(() => {});
   }, []);

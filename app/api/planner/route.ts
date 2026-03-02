@@ -12,12 +12,25 @@ function parseEvent(row: Record<string, unknown>) {
   };
 }
 
+function localDateStr(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const week = searchParams.get('week'); // ISO date of Monday e.g. "2024-03-11"
+  const week = searchParams.get('week');
+  const todayOnly = searchParams.get('today') === '1';
   let rows;
-  if (week) {
-    // Return 7 days from week start
+  if (todayOnly) {
+    // Use server local date — avoids Pi browser UTC timezone mismatch
+    const today = localDateStr(new Date());
+    rows = (db as import('better-sqlite3').Database)
+      .prepare('SELECT * FROM planner_events WHERE date = ? ORDER BY start_time')
+      .all(today);
+  } else if (week) {
     const start = new Date(week);
     const dates: string[] = [];
     for (let i = 0; i < 7; i++) {
