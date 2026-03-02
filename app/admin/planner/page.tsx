@@ -3,12 +3,11 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import {
   ChevronLeft, ChevronRight, Plus, X, Check, Trash2,
   Flag, Clock, Tag, FileText, CalendarDays, BarChart2,
-  TrendingUp, Target, Hash, Edit2, GripVertical, AlertCircle
+  TrendingUp, Target, Hash, Edit2
 } from 'lucide-react';
 import type { PlannerEvent, KpiItem } from '@/lib/types';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const HOUR_HEIGHT = 64; // px per hour
@@ -75,10 +74,6 @@ function eventTop(event: PlannerEvent): number {
 function eventHeight(event: PlannerEvent): number {
   const dur = parseTime(event.end_time) - parseTime(event.start_time);
   return Math.max(dur * HOUR_HEIGHT, HOUR_HEIGHT * 0.25);
-}
-
-function getCategoryColor(cat: string): string {
-  return CATEGORIES.find(c => c.value === cat)?.color ?? '#3b82f6';
 }
 
 function getPriorityInfo(p: string) {
@@ -304,15 +299,6 @@ export default function PlannerPage() {
   const deleteEvent = async (id: string) => {
     await fetch(`/api/planner/${id}`, { method: 'DELETE' });
     setShowEventModal(false);
-    await loadEvents();
-  };
-
-  const toggleComplete = async (ev: PlannerEvent, e: React.MouseEvent) => {
-    e.stopPropagation();
-    await fetch(`/api/planner/${ev.id}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...ev, completed: !ev.completed }),
-    });
     await loadEvents();
   };
 

@@ -198,8 +198,10 @@ export default function MediaPage() {
                 <div key={a.id} className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-xl overflow-hidden group hover:border-blue-500/50 transition-colors">
                   <div className="aspect-video bg-[hsl(var(--secondary))] relative flex items-center justify-center">
                     {a.file_path && (a.type === 'image') ? (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img src={a.file_path} alt={a.name} className="w-full h-full object-cover" />
                     ) : a.thumbnail_path ? (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img src={a.thumbnail_path} alt={a.name} className="w-full h-full object-cover" />
                     ) : (
                       <Icon className={`w-10 h-10 ${colorClass.split(' ')[0]}`} />

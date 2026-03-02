@@ -109,6 +109,7 @@ export default function DisplayPage() {
     switch (asset.type) {
       case 'image':
         return (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={asset.file_path ? asset.file_path : asset.url ?? ''}
             alt={asset.name}
@@ -131,6 +132,7 @@ export default function DisplayPage() {
         return (
           <div className="w-full h-full flex items-center justify-center bg-black">
             {(asset.metadata as { screenshot?: string })?.screenshot ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img src={(asset.metadata as { screenshot: string }).screenshot} className="w-full h-full object-cover" alt={asset.name} />
             ) : (
               <div className="text-white text-center p-8">
