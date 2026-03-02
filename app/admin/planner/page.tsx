@@ -3,7 +3,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import {
   ChevronLeft, ChevronRight, Plus, X, Check, Trash2,
   Flag, Clock, Tag, FileText, CalendarDays, BarChart2,
-  TrendingUp, Target, Hash, Edit2
+  TrendingUp, Target, Hash, Edit2, Monitor, Copy
 } from 'lucide-react';
 import type { PlannerEvent, KpiItem } from '@/lib/types';
 
@@ -361,6 +361,19 @@ export default function PlannerPage() {
           <p className="text-xs text-[hsl(var(--muted-foreground))]">{weekLabel}</p>
         </div>
         <div className="flex items-center gap-2 ml-auto">
+          {/* Display URL button */}
+          <div className="flex items-center gap-1">
+            <a href="/display-planner" target="_blank" rel="noreferrer"
+              className="flex items-center gap-1.5 border border-[hsl(var(--border))] hover:border-green-500 text-[hsl(var(--muted-foreground))] hover:text-green-400 px-3 py-1.5 rounded-lg text-sm transition-colors">
+              <Monitor className="w-4 h-4" /> Preview
+            </a>
+            <button
+              onClick={() => { navigator.clipboard.writeText(window.location.origin + '/display-planner'); }}
+              title="Copy display URL to clipboard"
+              className="flex items-center gap-1.5 border border-[hsl(var(--border))] hover:border-blue-500 text-[hsl(var(--muted-foreground))] hover:text-blue-400 px-2 py-1.5 rounded-lg text-sm transition-colors">
+              <Copy className="w-4 h-4" />
+            </button>
+          </div>
           {/* Tab switcher */}
           <div className="flex bg-[hsl(var(--secondary))] rounded-lg p-0.5 gap-0.5">
             <button onClick={() => setTab('planner')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === 'planner' ? 'bg-blue-600 text-white' : 'text-[hsl(var(--muted-foreground))] hover:text-white'}`}>
