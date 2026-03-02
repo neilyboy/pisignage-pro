@@ -106,6 +106,8 @@ export async function GET(req: NextRequest) {
     '',
     'exec chromium \\',
     '  --no-memcheck \\',
+    '  --window-size=1920,1080 \\',
+    '  --window-position=0,0 \\',
     '  --kiosk \\',
     '  --noerrdialogs \\',
     '  --disable-infobars \\',
