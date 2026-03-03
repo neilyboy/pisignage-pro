@@ -140,9 +140,9 @@ export default function DisplayPage() {
       case 'image':{
         const rawFit = (asset.metadata as { fit?: string })?.fit;
         const fit: React.CSSProperties['objectFit'] =
-          rawFit === 'contain' ? 'contain'
+          rawFit === 'cover' ? 'cover'
           : rawFit === 'fill' ? 'fill'
-          : 'cover';
+          : 'contain';
         return (
           <div className="w-full h-full bg-black flex items-center justify-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
