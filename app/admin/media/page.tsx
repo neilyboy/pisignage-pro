@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { Image as ImageIcon, Video, Globe, Type, Youtube, Clock, Upload, Plus, Trash2, Edit2, Search, X, Download, RefreshCw, CalendarDays, CloudSun, Folder, FolderOpen, FolderPlus, FolderInput } from 'lucide-react';
+import { Image as ImageIcon, Video, Globe, Type, Youtube, Clock, Upload, Plus, Trash2, Edit2, Search, X, Download, RefreshCw, CalendarDays, CloudSun, Folder, FolderOpen, FolderPlus, FolderInput, ZoomIn } from 'lucide-react';
 import type { Asset } from '@/lib/types';
 import { formatDuration } from '@/lib/utils';
 
@@ -43,6 +43,14 @@ export default function MediaPage() {
   const [renameValue, setRenameValue] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const modalFileRef = useRef<HTMLInputElement>(null);
+  const [lightbox, setLightbox] = useState<{ url: string; name: string; type: string } | null>(null);
+
+  useEffect(() => {
+    if (!lightbox) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setLightbox(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [lightbox]);
 
   const loadFolders = () => {
     fetch('/api/folders').then(r => r.json()).then(setFolders).catch(() => {});
@@ -389,10 +397,12 @@ export default function MediaPage() {
                       <div className="aspect-video bg-[hsl(var(--secondary))] relative flex items-center justify-center">
                         {a.file_path && a.type === 'image' ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={a.file_path} alt={a.name} className="w-full h-full object-cover" />
+                          <img src={a.file_path} alt={a.name} className="w-full h-full object-cover cursor-zoom-in"
+                            onClick={() => setLightbox({ url: a.file_path!, name: a.name, type: 'image' })} />
                         ) : a.thumbnail_path ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={a.thumbnail_path} alt={a.name} className="w-full h-full object-cover" />
+                          <img src={a.thumbnail_path} alt={a.name} className={`w-full h-full object-cover ${a.type === 'video' && a.file_path ? 'cursor-zoom-in' : ''}`}
+                            onClick={() => a.type === 'video' && a.file_path && setLightbox({ url: a.file_path, name: a.name, type: 'video' })} />
                         ) : (
                           <Icon className={`w-10 h-10 ${colorClass.split(' ')[0]}`} />
                         )}
@@ -401,6 +411,13 @@ export default function MediaPage() {
                             <div className="text-xs text-white text-center"><RefreshCw className="w-6 h-6 animate-spin mx-auto mb-1" />Downloading…</div>
                           </div>
                         )}
+                        {(a.type === 'image' && a.file_path) || (a.type === 'video' && a.file_path) ? (
+                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                            <div className="bg-black/50 rounded-full p-2">
+                              <ZoomIn className="w-5 h-5 text-white" />
+                            </div>
+                          </div>
+                        ) : null}
                         <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button onClick={() => openEdit(a)} className="p-1.5 bg-black/60 hover:bg-blue-600 text-white rounded-lg" title="Edit"><Edit2 className="w-3.5 h-3.5" /></button>
                           <button onClick={() => deleteAsset(a.id)} className="p-1.5 bg-black/60 hover:bg-red-600 text-white rounded-lg" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
@@ -454,6 +471,39 @@ export default function MediaPage() {
 
         </div>
       </div>
+
+      {/* Lightbox */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 bg-black/90 flex flex-col items-center justify-center z-50 p-4"
+          onClick={() => setLightbox(null)}
+        >
+          <div className="absolute top-4 right-4 flex items-center gap-3">
+            <span className="text-white/70 text-sm truncate max-w-[300px]">{lightbox.name}</span>
+            <button onClick={() => setLightbox(null)} className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          {lightbox.type === 'image' ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={lightbox.url}
+              alt={lightbox.name}
+              className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
+              onClick={e => e.stopPropagation()}
+            />
+          ) : (
+            <video
+              src={lightbox.url}
+              controls
+              autoPlay
+              className="max-w-full max-h-[90vh] rounded-lg shadow-2xl"
+              onClick={e => e.stopPropagation()}
+            />
+          )}
+          <div className="absolute bottom-4 text-white/40 text-xs">Click anywhere or press Esc to close</div>
+        </div>
+      )}
 
       {/* Add/Edit Modal */}
       {showModal && (
