@@ -138,9 +138,13 @@ export default function DisplayPage() {
     if (!asset) return null;
     switch (asset.type) {
       case 'image':{
-        const fit = (asset.metadata as { fit?: string })?.fit === 'contain' ? 'contain' : 'cover';
+        const rawFit = (asset.metadata as { fit?: string })?.fit;
+        const fit: React.CSSProperties['objectFit'] =
+          rawFit === 'contain' ? 'contain'
+          : rawFit === 'fill' ? 'fill'
+          : 'cover';
         return (
-          <div className="w-full h-full" style={{ background: fit === 'contain' ? 'transparent' : 'black' }}>
+          <div className="w-full h-full bg-black flex items-center justify-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={asset.file_path ? asset.file_path : asset.url ?? ''}

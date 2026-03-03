@@ -20,7 +20,7 @@ type FormState = {
   metadata: Record<string, unknown>; tags: string; folder: string;
 };
 
-const DEFAULT_FORM: FormState = { name: '', type: 'image', url: '', file_path: '', duration: 10, metadata: {}, tags: '', folder: '' };
+const DEFAULT_FORM: FormState = { name: '', type: 'image', url: '', file_path: '', duration: 10, metadata: { fit: 'cover' }, tags: '', folder: '' };
 
 export default function MediaPage() {
   const [assets, setAssets] = useState<(Asset & { folder?: string | null })[]>([]);
@@ -78,7 +78,11 @@ export default function MediaPage() {
   };
   const openEdit = (a: Asset & { folder?: string | null }) => {
     setEditId(a.id);
-    setForm({ name: a.name, type: a.type, url: a.url ?? '', file_path: a.file_path ?? '', duration: a.duration, metadata: a.metadata, tags: a.tags.join(', '), folder: a.folder ?? '' });
+    const meta = { ...a.metadata };
+    if (a.type === 'image' && !(meta as Record<string, unknown>).fit) {
+      (meta as Record<string, unknown>).fit = 'cover';
+    }
+    setForm({ name: a.name, type: a.type, url: a.url ?? '', file_path: a.file_path ?? '', duration: a.duration, metadata: meta, tags: a.tags.join(', '), folder: a.folder ?? '' });
     setShowModal(true);
   };
 
